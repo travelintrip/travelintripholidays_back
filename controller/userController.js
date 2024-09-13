@@ -20,7 +20,7 @@ import promoModel from "../models/promoModel.js";
 import taxModel from "../models/taxModel.js";
 import notificationModel from "../models/notificationModel.js";
 import messageModel from "../models/messageModel.js";
-import Razorpay from "razorpay";
+import razorpay from "razorpay";
 import nodemailer from "nodemailer";
 import { createServer } from "http";
 import querystring from "querystring";
@@ -36,6 +36,9 @@ import valetRideModel from "../models/valetRideModel.js";
 import { type } from "os";
 import LeadModel from "../models/LeadModel.js";
 // import { sendMessage } from "../utils/whatsappClient.js";
+import crypto from "crypto";
+import paymentModel from "../models/paymentModel.js";
+
 dotenv.config();
 
 const storage = multer.diskStorage({
@@ -126,6 +129,10 @@ export const SignupUserImage = upload.fields([
   { name: "PassPort", maxCount: 1 },
   { name: "Electricity", maxCount: 1 },
   { name: "WaterBill", maxCount: 1 },
+]);
+
+export const profileUserImage = upload.fields([
+  { name: "profile", maxCount: 1 },
 ]);
 
 // Utility function to compress and save the image
@@ -1061,7 +1068,102 @@ export const GetUserNotification = async (req, res) => {
   }
 };
 
+const instance = new razorpay({
+  key_id: process.env.LIVEKEY,
+  key_secret: process.env.LIVESECRET,
+});
 // Wallet functionality
+
+export const CheckoutWallet = async (req, res) => {
+  const { amount, userId, note } = req.body;
+  const gstRate = 0.18;
+  const startAmount = amount * gstRate;
+  const finalAmount = amount + startAmount;
+
+  const options = {
+    amount: Number(finalAmount * 100),
+    currency: "INR",
+  };
+  const order = await instance.orders.create(options);
+  const payment = await new paymentModel({
+    totalAmount: finalAmount,
+    userId: userId,
+    razorpay_order_id: order.id,
+    note: note,
+  });
+  await payment.save();
+
+  console.log(order, payment);
+  res.status(200).json({
+    success: true,
+    order,
+  });
+};
+
+export const paymentverification = async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+    req.body;
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedsgnature = crypto
+    .createHmac("sha256", process.env.LIVESECRET)
+    .update(body.toString())
+    .digest("hex");
+  const isauth = expectedsgnature === razorpay_signature;
+  if (isauth) {
+    // await Payment.create({
+    //   razorpay_order_id,
+    //   razorpay_payment_id,
+    //   razorpay_signature,
+    // });
+
+    const payment = await paymentModel.findOneAndUpdate(
+      { razorpay_order_id: razorpay_order_id },
+      {
+        razorpay_payment_id,
+        razorpay_signature,
+        payment: 1,
+      },
+      { new: true } // This option returns the updated document
+    );
+    console.log(
+      "razorpay_order_id, razorpay_payment_id, razorpay_signature",
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+
+    console.log("razorpay_signature", payment, req.body);
+
+    const gstRate = 0.18; // 18% GST
+
+    // Calculate the base amount before GST
+    const baseAmount = payment.totalAmount / (1 + gstRate);
+
+    const finalAmount = baseAmount.toFixed(2);
+
+    await AddWalletPayment(payment.userId, 0, payment.note, finalAmount);
+
+    res.redirect(
+      `${process.env.LIVEWEB}paymentsuccess?reference=${razorpay_payment_id}`
+    );
+  } else {
+    await Payment.findOneAndUpdate(
+      { razorpay_order_id },
+      {
+        payment: 2,
+      },
+      { new: true } // This option returns the updated document
+    );
+
+    res.status(400).json({ success: false });
+  }
+};
+
+export const WalletKey = async (req, res) => {
+  return res
+    .status(200)
+    .json({ key: encrypt(process.env.LIVEKEY, process.env.APIKEY) });
+};
 
 export const AddWallet = async (req, res) => {
   try {
@@ -1129,6 +1231,67 @@ export const AddWallet = async (req, res) => {
   }
 };
 
+export const AddWalletPayment = async (userId, type, note, wallet) => {
+  try {
+    // for create trasaction id
+
+    const lastTrans = await transactionModel
+      .findOne()
+      .sort({ _id: -1 })
+      .limit(1);
+
+    let lastTransId = 1;
+
+    if (lastTrans && lastTrans.t_id) {
+      const pre_id = lastTrans.t_id;
+      const pre_final_id = pre_id.replace(/tt00/g, "");
+      const final_id = parseFloat(pre_final_id) + 1;
+      lastTransId = "tt00" + final_id;
+
+      console.log("final_id", parseFloat(pre_final_id) + 1);
+      console.log("lastTransId", lastTransId);
+    } else {
+      lastTransId = "tt001";
+    }
+
+    // Calculate the auto-increment ID
+    const t_id = lastTransId;
+
+    // Create a new transaction
+    const transaction = new transactionModel({
+      userId,
+      type,
+      note,
+      amount: wallet,
+      t_id,
+    });
+
+    await transaction.save();
+
+    // Update user's wallet amount
+    const user = await userModel.findById(userId);
+
+    if (!user) {
+      console.log("User not found");
+      return { success: false, message: "User not found" };
+    }
+
+    user.wallet += wallet;
+
+    await user.save();
+    console.log("Wallet updated successfully");
+    return { success: true, message: "Wallet updated successfully" };
+  } catch (error) {
+    console.log(`Error adding to wallet: ${error}`);
+
+    return {
+      success: false,
+      message: `Error adding to wallet: ${error}`,
+      error,
+    };
+  }
+};
+
 export const AllTransaction = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1142,6 +1305,25 @@ export const AllTransaction = async (req, res) => {
   } catch (error) {
     return res.status(500).send({
       message: `Error transaction fetched: ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const AllPayment = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const transactions = await paymentModel.find({ userId: userId }).lean();
+
+    return res.status(200).send({
+      success: true,
+      message: "payments fetched successfully",
+      transactions,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      message: `Error payments fetched: ${error}`,
       success: false,
       error,
     });
@@ -4175,6 +4357,49 @@ export const sendAisensyOTP = async (req, res) => {
   }
 };
 
+export const sendAisensyLoginOTP = async (phone, otp) => {
+  const data = {
+    apiKey: process.env.AisensyAPIKEY,
+    campaignName: "Signup otp",
+    destination: `91${phone}`,
+    userName: "Travelin Trip Holidays",
+    templateParams: [`${otp}`],
+    source: "new-landing-page form",
+    media: {},
+    buttons: [
+      {
+        type: "button",
+        sub_type: "url",
+        index: 0,
+        parameters: [
+          {
+            type: "text",
+            text: "TESTCODE20",
+          },
+        ],
+      },
+    ],
+    carouselCards: [],
+    location: {},
+    paramsFallbackValue: {
+      FirstName: "user",
+    },
+  };
+  axios
+    .post("https://backend.aisensy.com/campaign/t1/api/v2", data, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+    .then((response) => {
+      console.log("Response:", response.data);
+    })
+    .catch((error) => {
+      console.error("Error:", error);
+    });
+  console.log(`Aisensy otp ${otp} for ${phone}`);
+};
+
 export const SignupLoginUser = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -4215,6 +4440,8 @@ export const SignupLoginUser = async (req, res) => {
           });
         }
         // await sendLogOTP(phone, otp);
+        //  await sendAisensyLoginOTP(phone, otp);
+
         console.log(otp);
         return res.status(201).json({
           success: true,
@@ -4258,6 +4485,7 @@ export const SignupNewUser = async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000);
     // // Send OTP via Phone
     // await sendOTP(phone, otp);
+    //  await sendAisensyLoginOTP(phone, otp);
 
     // Validation
     if (!phone) {
@@ -4304,6 +4532,7 @@ export const LoginUserWithOTP = async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000);
     // // Send OTP via Phone
     // await sendLogOTP(phone, otp);
+    //  await sendAisensyLoginOTP(phone, otp);
 
     // Validation
     if (!phone) {
@@ -4542,40 +4771,24 @@ export const AuthUserByPhone = async (req, res) => {
 export const updateProfileUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, state, email, address, password, longitude, latitude } =
-      req.body;
+    const { username, email, password } = req.body;
     const profile = req.files ? req.files.profile : undefined;
 
-    // Validate input fields based on whether password is provided
-    if (!password && !longitude && !latitude) {
-      if (!username || !email || !address || !state) {
-        return res.status(400).json({
-          success: false,
-          message: "Please fill all fields",
-        });
-      }
+    if (!username || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill all fields",
+      });
     }
 
     // Prepare update fields
     let updateFields = {
       username,
       email,
-      address,
-      state,
     };
 
     if (profile && profile[0]) {
       updateFields.profile = profile[0].path; // Assumes profile[0] is the uploaded file
-    }
-
-    // Handle profile image update if available
-    if (longitude) {
-      updateFields.longitude = longitude;
-    }
-
-    // Handle profile image update if available
-    if (latitude) {
-      updateFields.latitude = latitude;
     }
 
     // Update password if provided
@@ -6493,6 +6706,8 @@ export const AddUserLeadController = async (req, res) => {
       typeRange,
       traveller,
       source,
+      PickupTime,
+      ridetype,
     } = req.body;
 
     // Validation
@@ -6543,6 +6758,8 @@ export const AddUserLeadController = async (req, res) => {
       typeRange,
       traveller,
       source,
+      PickupTime,
+      ridetype,
     });
     await newLead.save();
 
@@ -6659,8 +6876,6 @@ export const getAllLeadsEmployee = async (req, res) => {
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
     const status = req.query.status || ""; // Get search term from the query parameters
     const EmployeeId = req.query.EmployeeId || ""; // Get search term from the query parameters
-
-    
 
     const skip = (page - 1) * limit;
 

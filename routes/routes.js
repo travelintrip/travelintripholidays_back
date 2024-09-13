@@ -117,6 +117,7 @@ import {
   findUserschatController,
   findchatController,
   AllTransaction,
+  AllPayment,
   AddWallet,
   StartOrderVerifyRide,
   EndOrderVerifyRide,
@@ -210,6 +211,10 @@ import {
   AddUserLeadController,
   AddEmployeeLeadController,
   getAllLeadsEmployee,
+  profileUserImage,
+  CheckoutWallet,
+  WalletKey,
+  paymentverification,
   // AddUserLeadController
 } from "../controller/userController.js";
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -503,8 +508,13 @@ router.delete("/delete-notification/:id", checkOrigin, DeleteNotification);
 router.get("/get-notification/:userId/", checkOrigin, GetUserNotification);
 
 router.post("/add-wallet", checkOrigin, AddWallet);
+router.post("/checkout-wallet", checkOrigin, CheckoutWallet);
+router.post("/paymentverification-wallet", paymentverification);
+
+router.get("/api/get-key", checkOrigin, WalletKey);
 
 router.get("/all-transaction/:userId/", checkOrigin, AllTransaction);
+router.get("/all-payment/:userId/", checkOrigin, AllPayment);
 
 router.post("/add-cart", checkOrigin, AddCart);
 router.get("/get-cart/:id", checkOrigin, getCart);
@@ -513,7 +523,7 @@ router.put("/update-cart/:id", checkOrigin, UpdateCart);
 router.get("/all-blogs", checkOrigin, getAllBlogsController);
 
 router.put("/update-user/:id", updateUserController);
-router.put("/update-profile/:id", SignupUserImage, updateProfileUser);
+router.put("/update-profile/:id", profileUserImage, updateProfileUser);
 
 router.post("/create-blog", createBlogController);
 router.put("/update-blog/:id", updateBlogController);
