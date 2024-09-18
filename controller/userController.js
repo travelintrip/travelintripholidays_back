@@ -38,6 +38,9 @@ import LeadModel from "../models/LeadModel.js";
 // import { sendMessage } from "../utils/whatsappClient.js";
 import crypto from "crypto";
 import paymentModel from "../models/paymentModel.js";
+import PDFDocument from "pdfkit";
+import { PassThrough } from "stream";
+import puppeteer from "puppeteer";
 
 dotenv.config();
 
@@ -484,6 +487,48 @@ export const userByIdLeadController = async (req, res) => {
     const leads = await LeadModel.find({ BuyId: buyIdObjectId })
       .skip(skipNumber)
       .limit(limitNumber);
+
+    // Send the response with the leads
+    return res.status(200).json({
+      message: "Leads fetched successfully",
+      success: true,
+      data: {
+        leads,
+        totalCount: totalLeadsCount,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({
+      message: `Error occurred while fetching leads: ${error.message}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const userByIdReportLeadController = async (req, res) => {
+  // Extract pagination parameters and BuyId from the request query
+  const { buyId } = req.query;
+
+  // Ensure buyId is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(buyId)) {
+    return res.status(400).send({
+      message: "Invalid BuyId",
+      success: false,
+    });
+  }
+
+  // Convert buyId to mongoose ObjectId
+  const buyIdObjectId = new mongoose.Types.ObjectId(buyId);
+
+  try {
+    const totalLeadsCount = await LeadModel.find({
+      BuyId: buyIdObjectId,
+    }).countDocuments();
+
+    // Query to find leads by BuyId
+    const leads = await LeadModel.find({ BuyId: buyIdObjectId });
 
     // Send the response with the leads
     return res.status(200).json({
@@ -1075,7 +1120,7 @@ const instance = new razorpay({
 // Wallet functionality
 
 export const CheckoutWallet = async (req, res) => {
-  const { amount, userId, note } = req.body;
+  const { amount, userId, note, Local } = req.body;
   const gstRate = 0.18;
   const startAmount = amount * gstRate;
   const finalAmount = amount + startAmount;
@@ -1085,11 +1130,30 @@ export const CheckoutWallet = async (req, res) => {
     currency: "INR",
   };
   const order = await instance.orders.create(options);
+
+  // Calculate the auto-increment ID
+  const lastLead = await paymentModel.findOne().sort({ _id: -1 }).limit(1);
+  let paymentId;
+
+  if (lastLead) {
+    if (lastLead.paymentId === undefined) {
+      paymentId = 1;
+    } else {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastLead.paymentId);
+      paymentId = lastOrderId + 1;
+    }
+  } else {
+    paymentId = 1;
+  }
+
   const payment = await new paymentModel({
     totalAmount: finalAmount,
     userId: userId,
     razorpay_order_id: order.id,
     note: note,
+    Local: Local,
+    paymentId,
   });
   await payment.save();
 
@@ -4712,10 +4776,16 @@ export const AuthUserByID = async (req, res) => {
           notifications: existingUser.notifications,
           wallet: existingUser.wallet,
           profile: existingUser.profile,
-          carName: existingUser?.carName,
-          carNumber: existingUser?.carNumber,
           status: existingUser?.status,
           verified: existingUser?.verified,
+          c_name: existingUser?.c_name,
+          gstin: existingUser?.gstin,
+          city: existingUser?.city,
+          DL: existingUser?.DL,
+          PoliceVerification: existingUser?.PoliceVerification,
+          AadhaarBack: existingUser?.AadhaarBack,
+          AadhaarFront: existingUser?.AadhaarFront,
+          Local: existingUser?.Local,
         },
       });
 
@@ -4814,6 +4884,145 @@ export const updateProfileUser = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: successMessage,
+      updatedUser,
+    });
+  } catch (error) {
+    console.error("Error while updating profile:", error);
+    return res.status(400).json({
+      success: false,
+      message: `Error while updating profile: ${error.message}`,
+      error: error.message,
+    });
+  }
+};
+
+export const updateCompanyUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { c_name, address, city, state, pincode, gstin } = req.body;
+
+    console.log(c_name, address, city, state, pincode, gstin);
+    console.log(req.body);
+    let statetax = 0;
+    const mystate = await zonesModel.findById(state);
+    if (mystate && mystate.primary === 1) {
+      statetax = 1;
+    }
+    if (!c_name || !address || !city || !state || !pincode || !gstin) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill all fields",
+      });
+    }
+
+    // Prepare update fields
+    let updateFields = {
+      c_name,
+      address,
+      city,
+      state,
+      pincode,
+      gstin,
+      Local: statetax,
+    };
+
+    // Perform database update
+    const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      updatedUser,
+    });
+  } catch (error) {
+    console.error("Error while updating profile:", error);
+    return res.status(400).json({
+      success: false,
+      message: `Error while updating profile: ${error.message}`,
+      error: error.message,
+    });
+  }
+};
+
+// signup user
+
+export const UpdateKycImage = upload.fields([
+  { name: "DLfile", maxCount: 1 },
+  { name: "AadhaarFront", maxCount: 1 },
+  { name: "AadhaarBack", maxCount: 1 },
+  { name: "PoliceVerification", maxCount: 1 },
+]);
+
+export const updateKycUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const files = req.files || {};
+    console.log(" req.files", req.files);
+    // Extract files safely
+    const DLfile = files.DLfile ? files.DLfile[0] : undefined;
+    const PoliceVerification = files.PoliceVerification
+      ? files.PoliceVerification[0]
+      : undefined;
+    const AadhaarBack = files.AadhaarBack ? files.AadhaarBack[0] : undefined;
+    const AadhaarFront = files.AadhaarFront ? files.AadhaarFront[0] : undefined;
+
+    // Validate that all required files are present
+    if (!DLfile || !PoliceVerification || !AadhaarBack || !AadhaarFront) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "All required files (DLfile, PoliceVerification, AadhaarBack, AadhaarFront) must be provided.",
+      });
+    }
+
+    // Prepare update fields
+    let updateFields = {};
+
+    // Ensure that file paths are set correctly
+    if (DLfile) {
+      updateFields.DL = DLfile.path
+        .replace(/\\/g, "/")
+        .replace(/^public\//, ""); // Normalize path
+    }
+    if (PoliceVerification) {
+      updateFields.PoliceVerification = PoliceVerification.path
+        .replace(/\\/g, "/")
+        .replace(/^public\//, ""); // Normalize path
+    }
+    if (AadhaarBack) {
+      updateFields.AadhaarBack = AadhaarBack.path
+        .replace(/\\/g, "/")
+        .replace(/^public\//, ""); // Normalize path
+    }
+    if (AadhaarFront) {
+      updateFields.AadhaarFront = AadhaarFront.path
+        .replace(/\\/g, "/")
+        .replace(/^public\//, ""); // Normalize path
+    }
+    console.log("updateFields", updateFields); // This should now display the correct updateFields object
+
+    const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
       updatedUser,
     });
   } catch (error) {
@@ -6944,5 +7153,194 @@ export const getAllLeadsEmployee = async (req, res) => {
       success: false,
       error,
     });
+  }
+};
+
+const generateUserInvoicePDF = async (invoiceData) => {
+  // console.log(invoiceData);
+
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  const gstRate = 0.18;
+
+  const totalWithGST = invoiceData.totalAmount;
+  const amountWithoutGST = totalWithGST / (1 + gstRate);
+
+  const CSGT = invoiceData.totalAmount - amountWithoutGST.toFixed(2);
+
+  const TotalLocal = CSGT / 2;
+
+  const formatDate = (dateString) => {
+    const options = { year: "numeric", month: "long", day: "numeric" };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const formatTime = (dateString) => {
+    const options = { hour: "2-digit", minute: "2-digit" };
+    return new Date(dateString).toLocaleTimeString(undefined, options);
+  };
+
+  // Define the HTML content
+  const htmlContent = `
+    <div class="invoice">
+      <div class="invoice-header">
+        <div class="invoice-header-left">
+          <img src="https://www.travelintrip.com/assets/images/logo.png" alt="Company Logo" width="150">
+          
+          <p>Mig-38, Defence Colony, Karguan Ji,Jhansi</p>
+          <p>Email: info@travelintrip.com</p>
+          <p>Phone: +91 8076864876</p>
+        </div>
+        <div class="invoice-header-right">
+          <h2>Invoice</h2>
+          <p   >Invoice Number: #${invoiceData?.paymentId}</p>
+          <p>Date: ${formatDate(invoiceData?.createdAt)}     </p>
+           <p>Full Name: ${invoiceData.userId?.username}</p>
+            <p>Email Id: ${invoiceData.userId?.email}</p>
+            <p>Phone No.: ${invoiceData.userId?.phone}</p>
+
+          <p style=" color:${(() => {
+            if (invoiceData.payment === 0) {
+              return "orange";
+            } else if (invoiceData.payment === 1) {
+              return "green";
+            } else if (invoiceData.payment === 2) {
+              return "red";
+            }
+          })()}"
+          > Payment Status : 
+          ${(() => {
+            if (invoiceData.payment === 0) {
+              return "Pending";
+            } else if (invoiceData.payment === 1) {
+              return "Success";
+            } else if (invoiceData.payment === 2) {
+              return "failed";
+            }
+          })()}
+          
+         </p> 
+                         
+        </div>
+      </div>
+
+      <table class="invoice-table">
+        <thead>
+          <tr >
+            <th >Item</th>
+           
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+ 
+            <tr>
+              <td> IT Service Fees</td>
+             
+              <td> ₹${parseFloat(amountWithoutGST.toFixed(2))}</td>
+            </tr>
+          
+            
+        </tbody>
+      </table>
+
+      <div class="invoice-total">
+        <p>Subtotal: ₹${parseFloat(amountWithoutGST.toFixed(2))}</p>
+        ${(() => {
+          if (invoiceData.Local === 1) {
+            return `<p>
+                CGST:  ₹${TotalLocal}
+              </p><p>
+                SGST:  ₹${TotalLocal}
+              </p>`;
+          } else if (invoiceData.Local === 0) {
+            return `<p>
+            IGST: ₹${invoiceData?.totalAmount - amountWithoutGST.toFixed(2)}
+          </p>`;
+          }
+        })()}
+        <p>Total: ₹${invoiceData?.totalAmount}</p>
+      </div>
+
+      <div class="invoice-footer">
+        <div class="text-center mt-3">
+          <p>Thank you for your support</p>
+        </div>
+      </div>
+    </div>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      h2 {
+        font-weight: 800;
+      }
+      .invoice {
+        width: 95%;
+        margin: 10px auto;
+        padding: 20px;
+      }
+      .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .invoice-header-left {
+        flex: 1;
+      }
+      .invoice-header-right {
+        flex: 1;
+        text-align: right;
+      }
+      .invoice-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 10%;
+      }
+      .invoice-table th,
+      .invoice-table td {
+        border: 1px solid #000;
+        padding: 10px;
+        text-align: center;
+      }
+      .invoice-table th {
+      
+        color:green;
+    
+      }
+      .invoice-total {
+        float: right;
+      }
+    </style>
+  `;
+
+  await page.setContent(htmlContent);
+  const pdfBuffer = await page.pdf({ format: "A4" });
+
+  await browser.close();
+
+  return pdfBuffer;
+};
+
+export const downloadUserInvoice = async (req, res) => {
+  try {
+    const { invoiceId } = req.body; // Assuming invoiceData is sent in the request body
+    if (!invoiceId) {
+      return res.status(400).send("Invoice ID is required");
+    }
+    // Fetch invoice data from the database
+    const invoiceData = await paymentModel
+      .findById(invoiceId)
+      .populate("userId");
+
+    const pdfBuffer = await generateUserInvoicePDF(invoiceData);
+
+    res.setHeader("Content-Disposition", "attachment; filename=invoice.pdf");
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating invoice PDF:", error);
+    res.status(500).send("Internal Server Error");
   }
 };

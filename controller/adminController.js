@@ -3208,6 +3208,8 @@ export const getAllPaymentsAdmin = async (req, res) => {
       query.createdAt = { $lte: endDate };
     }
 
+    query.type = 0; // Use $in operator to match any of the values in the array
+
     if (type.length > 0) {
       query.type = { $in: type }; // Use $in operator to match any of the values in the array
     }
@@ -3237,6 +3239,89 @@ export const getAllPaymentsAdmin = async (req, res) => {
     return res.status(200).send({
       // Send successful response
       message: "All data list",
+      Count: data.length,
+      currentPage: page,
+      totalPages: Math.ceil(totalData / limit),
+      success: true,
+      data: encrypt(data, process.env.APIKEY), // Return users array
+    });
+  } catch (error) {
+    return res.status(500).send({
+      // Send 500 Internal Server Error response
+      message: `Error while getting data: ${error.message}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+// for Reports
+
+export const getAllReportsAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1; // Current page, default is 1
+    const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
+    const searchTerm = req.query.search || ""; // Get search term from the query parameters
+    const type = 0;
+    // Get startDate and endDate from query parameters
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate)
+      : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
+
+      // Add regex pattern to search both username and email fields for the full name
+      query.$or = [
+        { name: regex },
+        // { email: regex },
+        // { phone: regex } // Add phone number search if needed
+      ];
+    }
+
+    // Add date range filtering to the query
+    if (startDate && endDate) {
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      query.createdAt = { $gte: startDate };
+    } else if (endDate) {
+      query.createdAt = { $lte: endDate };
+    }
+
+    query.type = 0; // Use $in operator to match any of the values in the array
+
+    if (type.length > 0) {
+      query.type = { $in: type }; // Use $in operator to match any of the values in the array
+    }
+
+    const totalData = await LeadModel.countDocuments(query); // Count total documents matching the query
+
+    const data = await LeadModel.find(query)
+      .sort({ _id: -1 }) // Sort by _id in descending order
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "BuyId", // The field to populate
+        select: "username phone ", // Only select the phone and name fields from the User model
+      })
+      .lean(); // Convert documents to plain JavaScript objects
+
+    if (!data || data.length === 0) {
+      // Check if no users found
+      return res.status(400).send({
+        // Send 404 Not Found response
+        message: "No data found",
+        success: false,
+      });
+    }
+
+    return res.status(200).send({
+      // Send successful response
+      message: "All reports list",
       Count: data.length,
       currentPage: page,
       totalPages: Math.ceil(totalData / limit),
@@ -4476,7 +4561,7 @@ export const exportTransUserAdmin = async (req, res) => {
     // Fetch data from the database (assuming using Mongoose)
     //   const products = await productModel.find({}, 'title description pImage images slug regularPrice salePrice status stock Category weight tag').lean();
     const transaction = await transactionModel
-      .find({}, "t_id userId note amount")
+      .find({ type: 0 }, "t_id userId note amount")
       .lean();
 
     const filename = "all_payments.csv";

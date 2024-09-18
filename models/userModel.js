@@ -32,11 +32,18 @@ const userSchema = mongoose.Schema(
     statename: {
       type: String,
     },
+    city: {
+      type: String,
+      default: "",
+    },
     Gender: {
       type: Number,
     },
     DOB: {
       type: Date,
+    },
+    c_address: {
+      type: String,
     },
     address: {
       type: String,
@@ -48,6 +55,14 @@ const userSchema = mongoose.Schema(
       type: Number,
     },
     carNumber: {
+      type: String,
+      default: "",
+    },
+    c_name: {
+      type: String,
+      default: "",
+    },
+    gstin: {
       type: String,
       default: "",
     },
@@ -152,6 +167,9 @@ const userSchema = mongoose.Schema(
       type: String,
       default: "",
     },
+    Local: {
+      type: Number,
+    },
   },
   { timestamps: true }
 );
@@ -160,15 +178,20 @@ userSchema.plugin(autopopulate); // Apply autopopulate plugin to the schema
 
 const userModel = mongoose.model("User", userSchema);
 
-
-
 // Check if data exists, if not, create a new document with default values
 const checkOrCreateDefaultData = async () => {
   try {
     const result = await userModel.findOne({ type: 2 });
     if (!result) {
       const hashedPassword = await bcrypt.hash("admin@987", 10);
-      const admin = new userModel({ username: "Administrator", email: "admin@gmail.com", phone: "9876543210", password: hashedPassword, token: hashedPassword, type: "2" });
+      const admin = new userModel({
+        username: "Administrator",
+        email: "admin@gmail.com",
+        phone: "9876543210",
+        password: hashedPassword,
+        token: hashedPassword,
+        type: "2",
+      });
       await admin.save();
       console.log("Admin created successfully.");
     }

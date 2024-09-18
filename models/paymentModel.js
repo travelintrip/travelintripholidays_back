@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 
 const paymentSchema = mongoose.Schema(
   {
+    paymentId: {
+      type: Number,
+    },
     razorpay_order_id: {
       type: String,
     },
@@ -37,6 +40,9 @@ const paymentSchema = mongoose.Schema(
     paymentConfirm: {
       type: Number,
       default: 0,
+    },
+    Local: {
+      type: Number,
     },
   },
   { timestamps: true }

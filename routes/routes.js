@@ -83,6 +83,7 @@ import {
   getAllLeadsAdmin,
   deleteLeadAdmin,
   getAllPaymentsAdmin,
+  getAllReportsAdmin,
   exportTransUserAdmin,
   editUserDetailAdmin,
   GetLeadByIDAdmin,
@@ -139,6 +140,9 @@ import {
   AuthUserByID,
   AuthUserByPhone,
   updateProfileUser,
+  updateCompanyUser,
+  updateKycUser,
+  UpdateKycImage,
   SignupNewUser,
   LoginUserWithOTP,
   LoginUserWithPass,
@@ -207,6 +211,7 @@ import {
   userBuyLeadController,
   userAllLeadController,
   userByIdLeadController,
+  userByIdReportLeadController,
   sendAisensyOTP,
   AddUserLeadController,
   AddEmployeeLeadController,
@@ -215,6 +220,7 @@ import {
   CheckoutWallet,
   WalletKey,
   paymentverification,
+  downloadUserInvoice,
   // AddUserLeadController
 } from "../controller/userController.js";
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -277,6 +283,7 @@ router.get("/admin/get-lead/:id", GetLeadByIDAdmin);
 router.put("/admin/update-lead/:id", updateLeadAdmin);
 
 router.get("/admin/all-payments", getAllPaymentsAdmin);
+router.get("/admin/all-reports", getAllReportsAdmin);
 
 router.post("/admin/forgot", ForgotAdminPassword);
 router.post("/admin/change-pass", ChangePassAdmin);
@@ -425,6 +432,7 @@ router.get("/admin/export/alltrans", checkOrigin, exportTransUserAdmin);
 router.get("/user/all-leads", checkOrigin, userAllLeadController);
 router.post("/user/buy-leads", checkOrigin, userBuyLeadController);
 router.get("/user/leads", checkOrigin, userByIdLeadController);
+router.get("/user/leads/report", checkOrigin, userByIdReportLeadController);
 
 router.post("/signup-user-type", checkOrigin, SignupUserImage, SignupUserType);
 router.post(
@@ -524,6 +532,9 @@ router.get("/all-blogs", checkOrigin, getAllBlogsController);
 
 router.put("/update-user/:id", updateUserController);
 router.put("/update-profile/:id", profileUserImage, updateProfileUser);
+
+router.put("/update-company-profile/:id", updateCompanyUser);
+router.put("/update-kyc-profile/:id", UpdateKycImage, updateKycUser);
 
 router.post("/create-blog", createBlogController);
 router.put("/update-blog/:id", updateBlogController);
@@ -677,5 +688,7 @@ router.post("/login-verify-otp/", checkOrigin, LoginAndVerifyOTP);
 router.get("/send-otp-aisensy/:phone/", checkOrigin, sendAisensyOTP);
 
 router.post("/user/add-leads", AddUserLeadController);
+
+router.post("/download-invoice", downloadUserInvoice);
 
 export default router;
