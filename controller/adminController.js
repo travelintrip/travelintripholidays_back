@@ -2647,6 +2647,40 @@ export const editUserAdmin = async (req, res) => {
   }
 };
 
+export const editUserKYCAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { status } = req.body;
+
+    let updateFields = {
+      verified: status,
+    };
+
+    const user = await userModel.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+    if (!user) {
+      return res.status(200).send({
+        message: "NO User found",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      message: "User Updated!",
+      success: true,
+      user,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: `Error while updating User: ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
 export const getUserIdAdmin = async (req, res) => {
   try {
     const { id } = req.params;

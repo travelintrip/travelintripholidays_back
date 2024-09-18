@@ -57,6 +57,7 @@ import {
   AddAdminFolderController,
   GetFolderAdmin,
   editUserAdmin,
+  editUserKYCAdmin,
   AddAdminAttributeController,
   deleteRatingAdmin,
   editReviewAdmin,
@@ -357,6 +358,8 @@ router.put("/admin/update-vendor-order/:id/", editOrderVendorAdmin);
 
 router.get("/admin/all-user", getAllUserAdmin);
 router.put("/admin/update-user/:id", editUserAdmin);
+router.put("/admin/update-user-kyc/:id", editUserKYCAdmin);
+
 router.get("/admin/get-user/:id", getUserIdAdmin);
 
 router.put("/admin/edit-user-detail/:id", editUserDetailAdmin);
