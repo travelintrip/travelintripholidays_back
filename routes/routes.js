@@ -222,6 +222,7 @@ import {
   WalletKey,
   paymentverification,
   downloadUserInvoice,
+  loginwithgoogle,
   // AddUserLeadController
 } from "../controller/userController.js";
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -693,5 +694,6 @@ router.get("/send-otp-aisensy/:phone/", checkOrigin, sendAisensyOTP);
 router.post("/user/add-leads", AddUserLeadController);
 
 router.post("/download-invoice", downloadUserInvoice);
+router.post("/auth/google/callback", loginwithgoogle);
 
 export default router;

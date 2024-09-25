@@ -41,6 +41,9 @@ import paymentModel from "../models/paymentModel.js";
 import PDFDocument from "pdfkit";
 import { PassThrough } from "stream";
 import puppeteer from "puppeteer";
+import { OAuth2Client } from "google-auth-library";
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 dotenv.config();
 
@@ -4504,7 +4507,7 @@ export const SignupLoginUser = async (req, res) => {
           });
         }
         // await sendLogOTP(phone, otp);
-        //  await sendAisensyLoginOTP(phone, otp);
+        await sendAisensyLoginOTP(phone, otp);
 
         console.log(otp);
         return res.status(201).json({
@@ -4549,7 +4552,7 @@ export const SignupNewUser = async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000);
     // // Send OTP via Phone
     // await sendOTP(phone, otp);
-    //  await sendAisensyLoginOTP(phone, otp);
+    await sendAisensyLoginOTP(phone, otp);
 
     // Validation
     if (!phone) {
@@ -4596,7 +4599,7 @@ export const LoginUserWithOTP = async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000);
     // // Send OTP via Phone
     // await sendLogOTP(phone, otp);
-    //  await sendAisensyLoginOTP(phone, otp);
+    await sendAisensyLoginOTP(phone, otp);
 
     // Validation
     if (!phone) {
@@ -7342,5 +7345,44 @@ export const downloadUserInvoice = async (req, res) => {
   } catch (error) {
     console.error("Error generating invoice PDF:", error);
     res.status(500).send("Internal Server Error");
+  }
+};
+
+export const loginwithgoogle = async (req, res) => {
+  const { idToken } = req.body;
+
+  const ticket = await client.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
+  });
+
+  const { sub: googleId, email, name } = ticket.getPayload();
+
+  try {
+    let user = await userModel.findOne({ googleId });
+    if (!user) {
+      user = await userModel.create({
+        googleId,
+        email,
+        name,
+      });
+    }
+
+    // Generate token for the session (optional)
+    const token = jwt.sign({ userId: user._id }, secretKey, {
+      expiresIn: "1h",
+    });
+
+    return res.status(200).send({
+      success: true,
+      message: "Login successfully",
+      user,
+      token,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      message: `Error on Google login: ${error.message}`,
+      success: false,
+    });
   }
 };
