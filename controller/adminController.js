@@ -3038,7 +3038,7 @@ export const getAllLeadsAdmin = async (req, res) => {
     const page = parseInt(req.query.page) || 1; // Current page, default is 1
     const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
     const searchTerm = req.query.search || ""; // Get search term from the query parameters
-
+    const type = parseInt(req.query.type) || 0;
     // Get startDate and endDate from query parameters
     const startDate = req.query.startDate
       ? new Date(req.query.startDate)
@@ -3073,6 +3073,25 @@ export const getAllLeadsAdmin = async (req, res) => {
       query.createdAt = { $gte: startDate };
     } else if (endDate) {
       query.createdAt = { $lte: endDate };
+    }
+    // close leads
+    if (type === 1) {
+      query.$expr = {
+        $eq: [{ $size: "$BuyId" }, "$count"], // Filter where count is greater than the size of BuyId array
+      };
+    }
+    // assign leads
+    if (type === 2) {
+      query.$expr = {
+        $lt: [{ $size: "$BuyId" }, "$count"], // Filter where count is greater than the size of BuyId array
+      };
+    }
+
+    // open leads
+    if (type === 3) {
+      query.$expr = {
+        $eq: [{ $size: "$BuyId" }, 0],
+      };
     }
 
     const totalData = await LeadModel.countDocuments(query); // Count total documents matching the query

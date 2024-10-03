@@ -297,11 +297,14 @@ export const userBuyLeadController = async (req, res) => {
 
     console.log(user.wallet, lead.CPC);
 
-    if (user.wallet + 1 < lead.CPC) {
-      return res.status(400).json({
-        message: "You do not have enough funds to accept this lead",
-        success: false,
-      });
+    if (user.wallet < lead.CPC || user.wallet === lead.CPC) {
+      if (user.wallet === lead.CPC) {
+      } else {
+        return res.status(400).json({
+          message: "You do not have enough funds to accept this lead",
+          success: false,
+        });
+      }
     }
 
     user.wallet -= lead.CPC;
@@ -354,6 +357,123 @@ export const userBuyLeadController = async (req, res) => {
   }
 };
 
+// export const userAllLeadController = async (req, res) => {
+//   try {
+//     // Extract pagination parameters from the request query
+//     const {
+//       skip = 0,
+//       limit = 50,
+//       sortOrder,
+//       status,
+//       type,
+//       searchTerm,
+//       userId,
+//     } = req.query;
+
+//     // Convert skip and limit to integers
+//     const skipNumber = parseInt(skip, 10);
+//     const limitNumber = parseInt(limit, 10);
+
+//     const query = {};
+//     if (searchTerm) {
+//       const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
+
+//       // Add regex pattern to search both username and email fields for the full name
+//       query.$or = [{ PickupLocation: regex }, { DropLocation: regex }];
+
+//       // if (!isNaN(Number(searchTerm))) {
+//       //   query.$or.push({ phone: Number(searchTerm) });
+//       // }
+//       // if (!isNaN(Number(searchTerm))) {
+//       //   query.$or.push({ LeadId: Number(searchTerm) });
+//       // }
+//     }
+
+//     console.log("sortOrder", sortOrder);
+
+//     if (status.length > 0) {
+//       if (status === "open") {
+//         query.status = { $in: 0 }; // Use $in operator to match any of the values in the array
+//       } else if (status === "closed") {
+//         query.status = { $in: 1 }; // Use $in operator to match any of the values in the array
+//       }
+//     }
+
+//     if (type.length > 0) {
+//       if (type === "ride") {
+//         query.type = { $in: 1 }; // Use $in operator to match any of the values in the array
+//       } else if (type === "tour") {
+//         query.type = { $in: 0 }; // Use $in operator to match any of the values in the array
+//       }
+//     }
+
+//     // Add userId filtering
+//     if (userId) {
+//       query.BuyId = { $nin: [userId] }; // Exclude leads where BuyId contains userId
+//     }
+//     // Check if count is greater than the length of BuyId
+//     query.$expr = {
+//       $gt: [
+//         { $size: "$BuyId" }, // Size of BuyId array
+//         "$count", // Value of count
+//       ],
+//     };
+
+//     // Logging the constructed query
+//     console.log("MongoDB Query:", JSON.stringify(query, null, 2));
+//     // // Add date range filtering to the query
+//     // if (startDate && endDate) {
+//     //   query.createdAt = { $gte: startDate, $lte: endDate };
+//     // } else if (startDate) {
+//     //   query.createdAt = { $gte: startDate };
+//     // } else if (endDate) {
+//     //   query.createdAt = { $lte: endDate };
+//     // }
+
+//     const sortOptions = {};
+
+//     // Conditionally add price (CPC) sorting
+//     if (sortOrder) {
+//       if (sortOrder === "highest") {
+//         sortOptions["CPC"] = -1; // Sort by CPC in descending order
+//       } else if (sortOrder === "lowest") {
+//         sortOptions["CPC"] = 1; // Sort by CPC in ascending order
+//       } else if (sortOrder === "latest") {
+//         sortOptions["_id"] = -1; // Sort by CPC in descending order
+//       } else if (sortOrder === "old") {
+//         sortOptions["_id"] = 1; // Sort by CPC in descending order
+//       }
+//     }
+
+//     console.log("sortOptions", sortOptions);
+
+//     // Fetch leads with pagination
+//     const leads = await LeadModel.find(query)
+//       .sort(sortOptions)
+//       .skip(skipNumber)
+//       .limit(limitNumber);
+
+//     // Fetch total count of leads for client-side pagination handling
+//     const totalLeadsCount = await LeadModel.find(query).countDocuments();
+
+//     return res.status(200).send({
+//       success: true,
+//       message: "Leads Found Successfully!",
+//       data: {
+//         leads,
+//         totalCount: totalLeadsCount,
+//       },
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     return res.status(500).send({
+//       message: `Error Occurred During Fetching Leads ${error}`,
+//       success: false,
+//       error,
+//     });
+//   }
+// };
+
 export const userAllLeadController = async (req, res) => {
   try {
     // Extract pagination parameters from the request query
@@ -365,84 +485,88 @@ export const userAllLeadController = async (req, res) => {
       type,
       searchTerm,
       userId,
+      startDate,
+      endDate,
     } = req.query;
 
     // Convert skip and limit to integers
     const skipNumber = parseInt(skip, 10);
     const limitNumber = parseInt(limit, 10);
 
-    const query = {};
+    const matchStage = {};
+
+    // Build the match stage
     if (searchTerm) {
-      const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
-
-      // Add regex pattern to search both username and email fields for the full name
-      query.$or = [{ PickupLocation: regex }, { DropLocation: regex }];
-
-      // if (!isNaN(Number(searchTerm))) {
-      //   query.$or.push({ phone: Number(searchTerm) });
-      // }
-      // if (!isNaN(Number(searchTerm))) {
-      //   query.$or.push({ LeadId: Number(searchTerm) });
-      // }
+      const regex = new RegExp(searchTerm, "i");
+      matchStage.$or = [{ PickupLocation: regex }, { DropLocation: regex }];
     }
 
-    console.log("sortOrder", sortOrder);
-
-    if (status.length > 0) {
+    if (status && status.length > 0) {
       if (status === "open") {
-        query.status = { $in: 0 }; // Use $in operator to match any of the values in the array
+        matchStage.status = 0; // Open leads
       } else if (status === "closed") {
-        query.status = { $in: 1 }; // Use $in operator to match any of the values in the array
+        matchStage.status = 1; // Closed leads
       }
     }
 
-    if (type.length > 0) {
+    if (type && type.length > 0) {
       if (type === "ride") {
-        query.type = { $in: 1 }; // Use $in operator to match any of the values in the array
+        matchStage.type = 1; // Ride type
       } else if (type === "tour") {
-        query.type = { $in: 0 }; // Use $in operator to match any of the values in the array
+        matchStage.type = 0; // Tour type
       }
     }
 
-    // Add userId filtering
+    // Parse startDate and endDate as Date objects
+    if (startDate) {
+      matchStage.createdAt = { $gte: new Date(startDate) }; // Ensure startDate is a Date object
+    }
+
+    if (endDate) {
+      matchStage.createdAt = {
+        ...matchStage.createdAt,
+        $lte: new Date(endDate),
+      }; // Ensure endDate is a Date object
+    }
+
     if (userId) {
-      query.BuyId = { $nin: [userId] }; // Exclude leads where BuyId contains userId
+      const userIdObject = new mongoose.Types.ObjectId(userId); // Correct usage
+      matchStage.BuyId = { $nin: [userIdObject] }; // Exclude leads with this userId
     }
 
-    // // Add date range filtering to the query
-    // if (startDate && endDate) {
-    //   query.createdAt = { $gte: startDate, $lte: endDate };
-    // } else if (startDate) {
-    //   query.createdAt = { $gte: startDate };
-    // } else if (endDate) {
-    //   query.createdAt = { $lte: endDate };
-    // }
+    // Create the aggregation pipeline
+    const pipeline = [
+      {
+        $match: matchStage, // Match stage
+      },
+      {
+        $addFields: {
+          BuyIdSize: { $size: "$BuyId" }, // Add a field for the size of BuyId
+        },
+      },
+      {
+        $match: {
+          $expr: { $gt: ["$count", "$BuyIdSize"] }, // Filter where count is greater than BuyId size
+        },
+      },
+      {
+        $sort: {
+          _id: sortOrder === "latest" ? -1 : 1, // Sort by _id based on sortOrder
+        },
+      },
+      {
+        $skip: skipNumber, // Skip for pagination
+      },
+      {
+        $limit: limitNumber, // Limit for pagination
+      },
+    ];
 
-    const sortOptions = {};
-
-    // Conditionally add price (CPC) sorting
-    if (sortOrder) {
-      if (sortOrder === "highest") {
-        sortOptions["CPC"] = -1; // Sort by CPC in descending order
-      } else if (sortOrder === "lowest") {
-        sortOptions["CPC"] = 1; // Sort by CPC in ascending order
-      } else if (sortOrder === "latest") {
-        sortOptions["_id"] = -1; // Sort by CPC in descending order
-      } else if (sortOrder === "old") {
-        sortOptions["_id"] = 1; // Sort by CPC in descending order
-      }
-    }
-
-    console.log("sortOptions", sortOptions);
-
-    // Fetch leads with pagination
-    const leads = await LeadModel.find(query)
-      .sort(sortOptions)
-      .skip(skipNumber)
-      .limit(limitNumber);
+    // Fetch leads using aggregation
+    const leads = await LeadModel.aggregate(pipeline);
 
     // Fetch total count of leads for client-side pagination handling
-    const totalLeadsCount = await LeadModel.find(query).countDocuments();
+    const totalLeadsCount = await LeadModel.countDocuments(matchStage);
 
     return res.status(200).send({
       success: true,
@@ -453,9 +577,9 @@ export const userAllLeadController = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return res.status(500).send({
-      message: `Error Occurred During Fetching Leads ${error}`,
+      message: `Error Occurred During Fetching Leads: ${error}`,
       success: false,
       error,
     });
