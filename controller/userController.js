@@ -285,7 +285,7 @@ export const userBuyLeadController = async (req, res) => {
         .json({ message: "Lead already purchased", success: false });
     }
 
-    if (lead.count < lead.BuyId.length) {
+    if (lead.count < lead.BuyId.length + 1) {
       return res.status(400).json({
         message: "Cannot add more BuyIds, limit reached",
         success: false,
@@ -308,7 +308,7 @@ export const userBuyLeadController = async (req, res) => {
     }
 
     user.wallet -= lead.CPC;
-
+    user.Leads.push(lead._id);
     lead.BuyId.push(BuyId);
 
     // for create trasaction id
@@ -317,19 +317,18 @@ export const userBuyLeadController = async (req, res) => {
       .findOne()
       .sort({ _id: -1 })
       .limit(1);
+    let lastTransId;
 
-    let lastTransId = 1;
-
-    if (lastTrans && lastTrans.t_id) {
-      const pre_id = lastTrans.t_id;
-      const final_id = pre_id.replace(/tt00/g, "");
-      lastTransId = "tt00" + parseFloat(final_id) + 1;
+    if (lastTrans) {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastTrans.t_no || 0);
+      lastTransId = lastOrderId + 1;
     } else {
-      lastTransId = "tt001";
+      lastTransId = 1;
     }
 
     // Calculate the auto-increment ID
-    const t_id = lastTransId;
+    const t_id = "tt00" + lastTransId;
 
     // Create a new transaction
     const transaction = new transactionModel({
@@ -338,6 +337,7 @@ export const userBuyLeadController = async (req, res) => {
       note: `Lead Id #${leadId} Purchase by user`,
       amount: -lead.CPC,
       t_id,
+      t_no: lastTransId,
     });
 
     await Promise.all([lead.save(), transaction.save(), user.save()]);
@@ -1366,23 +1366,18 @@ export const AddWallet = async (req, res) => {
       .findOne()
       .sort({ _id: -1 })
       .limit(1);
+    let lastTransId;
 
-    let lastTransId = 1;
-
-    if (lastTrans && lastTrans.t_id) {
-      const pre_id = lastTrans.t_id;
-      const pre_final_id = pre_id.replace(/tt00/g, "");
-      const final_id = parseFloat(pre_final_id) + 1;
-      lastTransId = "tt00" + final_id;
-
-      console.log("final_id", parseFloat(pre_final_id) + 1);
-      console.log("lastTransId", lastTransId);
+    if (lastTrans) {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastTrans.t_no || 0);
+      lastTransId = lastOrderId + 1;
     } else {
-      lastTransId = "tt001";
+      lastTransId = 1;
     }
 
     // Calculate the auto-increment ID
-    const t_id = lastTransId;
+    const t_id = "tt00" + lastTransId;
 
     // Create a new transaction
     const transaction = new transactionModel({
@@ -1391,6 +1386,7 @@ export const AddWallet = async (req, res) => {
       note,
       amount: wallet,
       t_id,
+      t_no: lastTransId,
     });
 
     await transaction.save();
@@ -1430,23 +1426,18 @@ export const AddWalletPayment = async (userId, type, note, wallet) => {
       .findOne()
       .sort({ _id: -1 })
       .limit(1);
+    let lastTransId;
 
-    let lastTransId = 1;
-
-    if (lastTrans && lastTrans.t_id) {
-      const pre_id = lastTrans.t_id;
-      const pre_final_id = pre_id.replace(/tt00/g, "");
-      const final_id = parseFloat(pre_final_id) + 1;
-      lastTransId = "tt00" + final_id;
-
-      console.log("final_id", parseFloat(pre_final_id) + 1);
-      console.log("lastTransId", lastTransId);
+    if (lastTrans) {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastTrans.t_no || 0);
+      lastTransId = lastOrderId + 1;
     } else {
-      lastTransId = "tt001";
+      lastTransId = 1;
     }
 
     // Calculate the auto-increment ID
-    const t_id = lastTransId;
+    const t_id = "tt00" + lastTransId;
 
     // Create a new transaction
     const transaction = new transactionModel({
@@ -1455,6 +1446,7 @@ export const AddWalletPayment = async (userId, type, note, wallet) => {
       note,
       amount: wallet,
       t_id,
+      t_no: lastTransId,
     });
 
     await transaction.save();
@@ -4611,23 +4603,26 @@ export const SignupLoginUser = async (req, res) => {
     const existingUser = await userModel.findOne({ phone });
 
     if (existingUser) {
-      if (existingUser.password !== undefined) {
-        if (existingUser.status === "0") {
-          return res.status(400).json({
-            success: false,
-            message: "An error occurred. Please contact support.",
-          });
-        }
+      if (
+        existingUser.password !== undefined &&
+        existingUser.status !== 0 &&
+        existingUser.status !== 2
+      ) {
         return res.status(201).json({
           success: true,
           message: "User found with password",
           password: true,
         });
       } else {
-        if (existingUser.status === "0") {
+        if (existingUser.status === 0) {
           return res.status(400).json({
             success: false,
             message: "An error occurred. Please contact support.",
+          });
+        } else if (existingUser.status === 2) {
+          return res.status(400).json({
+            success: false,
+            message: "Your Account has been suspended ",
           });
         }
         // await sendLogOTP(phone, otp);
@@ -4650,7 +4645,8 @@ export const SignupLoginUser = async (req, res) => {
         });
       }
     } else {
-      //  await sendRegOTP(phone, otp);
+      // await sendLogOTP(phone, otp);
+      await sendAisensyLoginOTP(phone, otp);
       return res.status(200).json({
         success: true,
         message: "New User found",
@@ -4686,8 +4682,19 @@ export const SignupNewUser = async (req, res) => {
       });
     }
 
+    // Calculate the auto-increment ID
+    const lastUser = await userModel.findOne().sort({ _id: -1 }).limit(1);
+    let userId;
+
+    if (lastUser) {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastUserId = parseInt(lastUser.userId || 0);
+      userId = lastUserId + 1;
+    } else {
+      userId = 1;
+    }
     // Create a new user
-    const user = new userModel({ phone });
+    const user = new userModel({ phone, userId, status: 1 });
 
     await user.save();
 
@@ -4701,7 +4708,7 @@ export const SignupNewUser = async (req, res) => {
         email: user.email,
         type: user.type,
         profile: user.profile,
-        status: "1",
+        status: 1,
       },
       otp: otp,
     });
@@ -5849,23 +5856,18 @@ export const EndOrderVerifyRide = async (req, res) => {
         .findOne()
         .sort({ _id: -1 })
         .limit(1);
+      let lastTransId;
 
-      let lastTransId = 1;
-
-      if (lastTrans && lastTrans.t_id) {
-        const pre_id = lastTrans.t_id;
-        const pre_final_id = pre_id.replace(/tt00/g, "");
-        const final_id = parseFloat(pre_final_id) + 1;
-        lastTransId = "tt00" + final_id;
-
-        console.log("final_id", parseFloat(pre_final_id) + 1);
-        console.log("lastTransId", lastTransId);
+      if (lastTrans) {
+        // Convert lastOrder.orderId to a number before adding 1
+        const lastOrderId = parseInt(lastTrans.t_no || 0);
+        lastTransId = lastOrderId + 1;
       } else {
-        lastTransId = "tt001";
+        lastTransId = 1;
       }
 
       // Calculate the auto-increment ID
-      const t_id = lastTransId;
+      const t_id = "tt00" + lastTransId;
 
       const transaction = new transactionModel({
         userId: order.driverId,
@@ -5874,6 +5876,7 @@ export const EndOrderVerifyRide = async (req, res) => {
           "Commission deducted and ride completed Booking ID #" + order.orderId,
         amount: -commissionAmount,
         t_id,
+        t_no: lastTransId,
       });
 
       await transaction.save();
@@ -6770,23 +6773,18 @@ export const EndValetVerifyRide = async (req, res) => {
         .findOne()
         .sort({ _id: -1 })
         .limit(1);
+      let lastTransId;
 
-      let lastTransId = 1;
-
-      if (lastTrans && lastTrans.t_id) {
-        const pre_id = lastTrans.t_id;
-        const pre_final_id = pre_id.replace(/tt00/g, "");
-        const final_id = parseFloat(pre_final_id) + 1;
-        lastTransId = "tt00" + final_id;
-
-        console.log("final_id", parseFloat(pre_final_id) + 1);
-        console.log("lastTransId", lastTransId);
+      if (lastTrans) {
+        // Convert lastOrder.orderId to a number before adding 1
+        const lastOrderId = parseInt(lastTrans.t_no || 0);
+        lastTransId = lastOrderId + 1;
       } else {
-        lastTransId = "tt001";
+        lastTransId = 1;
       }
 
       // Calculate the auto-increment ID
-      const t_id = lastTransId;
+      const t_id = "tt00" + lastTransId;
 
       const transaction = new transactionModel({
         userId: order.VendorId,
@@ -6796,6 +6794,7 @@ export const EndValetVerifyRide = async (req, res) => {
           order.orderId,
         amount: -commissionAmount,
         t_id,
+        t_no: lastTransId,
       });
 
       await transaction.save();

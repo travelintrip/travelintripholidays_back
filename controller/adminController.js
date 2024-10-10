@@ -40,6 +40,7 @@ import valetRideModel from "../models/valetRideModel.js";
 import transactionModel from "../models/transactionModel.js";
 import CryptoJS from "crypto-js"; // Import the crypto module
 import LeadModel from "../models/LeadModel.js";
+import moment from "moment";
 
 const encrypt = (data, key) => {
   const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(data), key).toString();
@@ -2461,6 +2462,30 @@ export const getAllUserAdmin = async (req, res) => {
         { phone: regex }, // Add phone number search if needed
       ];
     }
+    console.log("user", req.query.type);
+    let extraFilter = {};
+    if (req.query.type === 0 || req.query.type === "0") {
+      const user = await userModel.find(
+        { type: 0 },
+        "_id type status verified"
+      );
+      const ApprovedVendor = user.filter((user) => user.status === 1);
+      const PendingVendor = user.filter((user) => user.status === 0);
+      const SuspendVendor = user.filter((user) => user.status === 0);
+      const KYCApproved = user.filter((user) => user.verified === 1);
+      const KYCPending = user.filter((user) => user.verified === 0);
+      const KYCUnder = user.filter((user) => user.verified === 0);
+
+      extraFilter = {
+        ApprovedVendor: ApprovedVendor.length,
+        PendingVendor: PendingVendor.length,
+        SuspendVendor: SuspendVendor.length,
+        KYCApproved: KYCApproved.length,
+        KYCPending: KYCPending.length,
+        KYCUnder: KYCUnder.length,
+        totalVendor: user.length,
+      };
+    }
 
     if (type.length > 0) {
       query.type = { $in: type }; // Use $in operator to match any of the values in the array
@@ -2472,8 +2497,10 @@ export const getAllUserAdmin = async (req, res) => {
       query.verified = { $in: verified }; // Use $in operator to match any of the values in the array
     }
 
-    if (status.length > 0) {
-      query.status = { $in: status }; // Use $in operator to match any of the values in the array
+    if (status.length === 0) {
+      query.status = { $in: [0, 1] }; // Use $in operator to match any of the values in the array
+    } else {
+      query.status = { $in: Number(status) }; // Use $in operator to match any of the values in the array
     }
 
     // Add date range filtering to the query
@@ -2511,6 +2538,7 @@ export const getAllUserAdmin = async (req, res) => {
       totalPages: Math.ceil(totalUser / limit),
       success: true,
       users: encrypt(users, process.env.APIKEY), // Return users array
+      extraFilter,
     });
   } catch (error) {
     return res.status(500).send({
@@ -3315,6 +3343,99 @@ export const getAllReportsAdmin = async (req, res) => {
     const page = parseInt(req.query.page) || 1; // Current page, default is 1
     const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
     const searchTerm = req.query.search || ""; // Get search term from the query parameters
+    const type = req.query.type ? req.query.type.split(",") : [];
+    const status = req.query.status || ""; // Get search term from the query parameters
+    const verified = req.query.verified || ""; // Get search term from the query parameters
+
+    // Get startDate and endDate from query parameters
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate)
+      : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    // console.log(startDate, endDate)
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
+
+      // Add regex pattern to search both username and email fields for the full name
+      query.$or = [
+        { username: regex },
+        { email: regex },
+        { phone: regex }, // Add phone number search if needed
+      ];
+    }
+
+    if (type.length > 0) {
+      query.type = { $in: type }; // Use $in operator to match any of the values in the array
+    } else {
+      query.type = { $ne: 2 }; // Use $in operator to match any of the values in the array
+    }
+
+    if (verified.length > 0) {
+      query.verified = { $in: verified }; // Use $in operator to match any of the values in the array
+    }
+
+    if (status.length === 0) {
+      query.status = { $in: [0, 1] }; // Use $in operator to match any of the values in the array
+    } else {
+      query.status = { $in: Number(status) }; // Use $in operator to match any of the values in the array
+    }
+
+    // Add date range filtering to the query
+    if (startDate && endDate) {
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      query.createdAt = { $gte: startDate };
+    } else if (endDate) {
+      query.createdAt = { $lte: endDate };
+    }
+
+    const totalUser = await userModel.countDocuments(query); // Count total documents matching the query
+
+    const users = await userModel
+      .find(query)
+      .sort({ _id: -1 }) // Sort by _id in descending order
+      .skip(skip)
+      .limit(limit)
+      .populate("Leads") // Populate leads
+      .lean(); // Convert documents to plain JavaScript objects
+
+    if (!users || users.length === 0) {
+      // Check if no users found
+      return res.status(400).send({
+        // Send 404 Not Found response
+        message: "No users found",
+        success: false,
+      });
+    }
+
+    return res.status(200).send({
+      // Send successful response
+      message: "All user list",
+      userCount: users.length,
+      currentPage: page,
+      totalPages: Math.ceil(totalUser / limit),
+      success: true,
+      users: encrypt(users, process.env.APIKEY), // Return users array
+    });
+  } catch (error) {
+    return res.status(500).send({
+      // Send 500 Internal Server Error response
+      message: `Error while getting users: ${error.message}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const getAllReportsAdmin_old = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1; // Current page, default is 1
+    const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
+    const searchTerm = req.query.search || ""; // Get search term from the query parameters
     const type = 0;
     // Get startDate and endDate from query parameters
     const startDate = req.query.startDate
@@ -3592,6 +3713,68 @@ export const ViewAllAdminZones = async (req, res) => {
   } catch (error) {
     console.error("Error fetching ratings:", error);
     res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+// for dashboard
+
+export const AdminAllLeadsDasboard = async (req, res) => {
+  try {
+    const leads = await LeadModel.find({}, "_id type CPC count");
+    const user = await userModel.find({}, "_id type ");
+
+    if (!leads || !user) {
+      return res.status(200).send({
+        message: "NO data Found",
+        success: false,
+      });
+    }
+
+    // Separate leads into ride and tour
+    const rideLeads = leads.filter((lead) => lead.type === 1);
+    const tourLeads = leads.filter((lead) => lead.type === 0);
+
+    // Separate leads into ride and tour
+    const allEmployee = user.filter((lead) => lead.type === 1);
+    const AllVendor = user.filter((lead) => lead.type === 0);
+
+    // Calculate total CPC for all leads
+    const totalCPC = leads.reduce(
+      (sum, lead) => sum + lead.CPC * lead.count,
+      0
+    );
+
+    // Calculate total CPC for ride leads
+    const totalRideCPC = rideLeads.reduce(
+      (sum, lead) => sum + lead.CPC * lead.count,
+      0
+    );
+
+    // Calculate total CPC for tour leads
+    const totalTourCPC = tourLeads.reduce(
+      (sum, lead) => sum + lead.CPC * lead.count,
+      0
+    );
+
+    return res.status(200).send({
+      message: "All Dashboard Data ",
+      leadCount: leads.length,
+      success: true,
+      rideCount: rideLeads.length,
+      tourCount: tourLeads.length,
+      allUser: user.length,
+      allEmployee: allEmployee.length,
+      allVendor: AllVendor.length,
+      totalCPC,
+      totalRideCPC,
+      totalTourCPC,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      message: `error while All Dashboard data ${error}`,
+      success: false,
+      error,
+    });
   }
 };
 
@@ -4549,23 +4732,18 @@ export const AdminUpdateWallet = async (req, res) => {
       .findOne()
       .sort({ _id: -1 })
       .limit(1);
+    let lastTransId;
 
-    let lastTransId = 1;
-
-    if (lastTrans && lastTrans.t_id) {
-      const pre_id = lastTrans.t_id;
-      const pre_final_id = pre_id.replace(/tt00/g, "");
-      const final_id = parseFloat(pre_final_id) + 1;
-      lastTransId = "tt00" + final_id;
-
-      console.log("final_id", parseFloat(pre_final_id) + 1);
-      console.log("lastTransId", lastTransId);
+    if (lastTrans) {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastTrans.t_no || 0);
+      lastTransId = lastOrderId + 1;
     } else {
-      lastTransId = "tt001";
+      lastTransId = 1;
     }
 
     // Calculate the auto-increment ID
-    const t_id = lastTransId;
+    const t_id = "tt00" + lastTransId;
 
     // Create a new transaction
     const transaction = new transactionModel({
@@ -4574,6 +4752,7 @@ export const AdminUpdateWallet = async (req, res) => {
       note: "Funds Added By Travelintrip " + "( " + Comment + " )",
       amount: FinalAmount * (Type === 1 ? -1 : 1), // Ensure amount is negative if Type is 1 (minus)
       t_id,
+      t_no: lastTransId,
     });
 
     await transaction.save();

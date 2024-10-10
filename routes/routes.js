@@ -84,6 +84,7 @@ import {
   getAllLeadsAdmin,
   deleteLeadAdmin,
   getAllPaymentsAdmin,
+  AdminAllLeadsDasboard,
   getAllReportsAdmin,
   exportTransUserAdmin,
   editUserDetailAdmin,
@@ -285,7 +286,8 @@ router.get("/admin/get-lead/:id", GetLeadByIDAdmin);
 router.put("/admin/update-lead/:id", updateLeadAdmin);
 
 router.get("/admin/all-payments", getAllPaymentsAdmin);
-router.get("/admin/all-reports", getAllReportsAdmin);
+// router.get("/admin/all-reports", getAllReportsAdmin);
+router.get("/admin/all-dashboard", AdminAllLeadsDasboard);
 
 router.post("/admin/forgot", ForgotAdminPassword);
 router.post("/admin/change-pass", ChangePassAdmin);
@@ -360,6 +362,8 @@ router.put("/admin/update-vendor-order/:id/", editOrderVendorAdmin);
 router.get("/admin/all-user", getAllUserAdmin);
 router.put("/admin/update-user/:id", editUserAdmin);
 router.put("/admin/update-user-kyc/:id", editUserKYCAdmin);
+
+router.get("/admin/all-reports", getAllReportsAdmin);
 
 router.get("/admin/get-user/:id", getUserIdAdmin);
 
