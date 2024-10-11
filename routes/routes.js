@@ -224,6 +224,7 @@ import {
   paymentverification,
   downloadUserInvoice,
   loginwithgoogle,
+  userByLeadController,
   // AddUserLeadController
 } from "../controller/userController.js";
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -436,7 +437,7 @@ router.get("/admin/export/alltrans", checkOrigin, exportTransUserAdmin);
 
 router.get("/user/all-leads", checkOrigin, userAllLeadController);
 router.post("/user/buy-leads", checkOrigin, userBuyLeadController);
-router.get("/user/leads", checkOrigin, userByIdLeadController);
+router.get("/user/leads", checkOrigin, userByLeadController);
 router.get("/user/leads/report", checkOrigin, userByIdReportLeadController);
 
 router.post("/signup-user-type", checkOrigin, SignupUserImage, SignupUserType);

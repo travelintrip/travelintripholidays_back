@@ -42,6 +42,7 @@ import PDFDocument from "pdfkit";
 import { PassThrough } from "stream";
 import puppeteer from "puppeteer";
 import { OAuth2Client } from "google-auth-library";
+import buyModel from "../models/buyModel.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -182,83 +183,85 @@ export const handleImageCompression = async (req, res, next) => {
 
 // for Leads
 
-export const AddAdminLeadController = async (req, res) => {
-  try {
-    const {
-      PickupLocation,
-      DropLocation,
-      startDate,
-      endDate,
-      count,
-      name,
-      email,
-      phone,
-      CPC,
-      type,
-      userId,
-    } = req.body;
+// export const AddAdminLeadController = async (req, res) => {
+//   try {
+//     const {
+//       PickupLocation,
+//       DropLocation,
+//       startDate,
+//       endDate,
+//       count,
+//       name,
+//       email,
+//       phone,
+//       CPC,
+//       type,
+//       userId,
+//       source,
+//     } = req.body;
 
-    // Validation
-    if (
-      !PickupLocation ||
-      !DropLocation ||
-      !startDate ||
-      !endDate ||
-      !count ||
-      !name ||
-      !email ||
-      !phone ||
-      !CPC ||
-      !type
-    ) {
-      return res.status(400).send({
-        success: false,
-        message: "Please Provide All Fields",
-      });
-    }
+//     // Validation
+//     if (
+//       !PickupLocation ||
+//       !DropLocation ||
+//       !startDate ||
+//       !endDate ||
+//       !count ||
+//       !name ||
+//       !email ||
+//       !phone ||
+//       !CPC ||
+//       !type
+//     ) {
+//       return res.status(400).send({
+//         success: false,
+//         message: "Please Provide All Fields",
+//       });
+//     }
 
-    // Calculate the auto-increment ID
-    const lastLead = await LeadModel.findOne().sort({ _id: -1 }).limit(1);
-    let LeadId;
+//     // Calculate the auto-increment ID
+//     const lastLead = await LeadModel.findOne().sort({ _id: -1 }).limit(1);
+//     let LeadId;
 
-    if (lastLead) {
-      // Convert lastOrder.orderId to a number before adding 1
-      const lastOrderId = parseInt(lastLead.LeadId);
-      LeadId = lastOrderId + 1;
-    } else {
-      LeadId = 1;
-    }
+//     if (lastLead) {
+//       // Convert lastOrder.orderId to a number before adding 1
+//       const lastOrderId = parseInt(lastLead.LeadId);
+//       LeadId = lastOrderId + 1;
+//     } else {
+//       LeadId = 1;
+//     }
 
-    // Create a new category with the specified parent
-    const newLead = new LeadModel({
-      PickupLocation,
-      DropLocation,
-      startDate,
-      endDate,
-      count,
-      LeadId,
-      name,
-      email,
-      phone,
-      CPC,
-      type,
-      VendorId: userId,
-    });
-    await newLead.save();
+//     // Create a new category with the specified parent
+//     const newLead = new LeadModel({
+//       PickupLocation,
+//       DropLocation,
+//       startDate,
+//       endDate,
+//       count,
+//       LeadId,
+//       name,
+//       email,
+//       phone,
+//       CPC,
+//       type,
+//       VendorId: userId,
+//       source,
+//     });
+//     await newLead.save();
 
-    return res.status(200).send({
-      success: true,
-      message: "Leads Creating Successfully!",
-    });
-  } catch (error) {
-    console.error("Error while creating Leads:", error);
-    return res.status(400).send({
-      success: false,
-      message: "Error while creating Leads",
-      error,
-    });
-  }
-};
+//     return res.status(200).send({
+//       success: true,
+//       message: "Leads Creating Successfully!",
+//     });
+//   } catch (error) {
+//     console.error("Error while creating Leads:", error);
+//     return res.status(400).send({
+//       success: false,
+//       message: "Error while creating Leads",
+//       error,
+//     });
+//   }
+// };
 
 export const userBuyLeadController = async (req, res) => {
   const { BuyId, leadId } = req.body;
@@ -294,7 +297,12 @@ export const userBuyLeadController = async (req, res) => {
 
     // Update user wallet
     const user = await userModel.findById(BuyId);
-
+    if (user.status === 2) {
+      return res.status(400).json({
+        message: "Account Suspended",
+        success: false,
+      });
+    }
     console.log(user.wallet, lead.CPC);
 
     if (user.wallet < lead.CPC || user.wallet === lead.CPC) {
@@ -340,7 +348,18 @@ export const userBuyLeadController = async (req, res) => {
       t_no: lastTransId,
     });
 
-    await Promise.all([lead.save(), transaction.save(), user.save()]);
+    // Create a new transaction
+    const buymodel = new buyModel({
+      userId: BuyId,
+      leadId,
+    });
+
+    await Promise.all([
+      lead.save(),
+      transaction.save(),
+      user.save(),
+      buymodel.save(),
+    ]);
 
     return res.status(200).json({
       message: "BuyId successfully added to lead",
@@ -634,6 +653,64 @@ export const userByIdLeadController = async (req, res) => {
   }
 };
 
+export const userByLeadController = async (req, res) => {
+  // Extract pagination parameters and BuyId from the request query
+  const { skip = 0, limit = 50, buyId } = req.query;
+
+  // Convert skip and limit to integers
+  const skipNumber = parseInt(skip, 10);
+  const limitNumber = parseInt(limit, 10);
+
+  // Ensure buyId is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(buyId)) {
+    return res.status(400).send({
+      message: "Invalid BuyId",
+      success: false,
+    });
+  }
+
+  // Convert buyId to mongoose ObjectId
+  const buyIdObjectId = new mongoose.Types.ObjectId(buyId);
+
+  try {
+    const totalLeadsCount = await buyModel
+      .find({ userId: buyIdObjectId })
+      .populate("leadId"); // Replace with actual field names to populate;
+
+    // Query to find leads by BuyId
+    const leads = await buyModel
+      .find({ userId: buyIdObjectId })
+      .skip(skipNumber)
+      .limit(limitNumber)
+      .populate("leadId"); // Replace with actual field names to populate
+
+    // Filter out any leads where leadId could not be populated
+    const filteredLeads = leads.filter((lead) => lead.leadId !== null);
+    // Filter out any leads where leadId could not be populated
+    const totalLeadsCountLength = totalLeadsCount.filter(
+      (lead) => lead.leadId !== null
+    );
+    // Send the response with the leads
+    console.log(totalLeadsCount.length);
+
+    return res.status(200).json({
+      message: "Leads fetched successfully",
+      success: true,
+      data: {
+        leads: filteredLeads,
+        totalCount: totalLeadsCountLength.length,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({
+      message: `Error occurred while fetching leads: ${error.message}`,
+      success: false,
+      error,
+    });
+  }
+};
+
 export const userByIdReportLeadController = async (req, res) => {
   // Extract pagination parameters and BuyId from the request query
   const { buyId } = req.query;
@@ -714,10 +791,10 @@ export const SignupUserType = async (req, res) => {
 
     if (lastUser) {
       // Convert lastOrder.orderId to a number before adding 1
-      const lastUserId = parseInt(lastUser.userId || 0);
+      const lastUserId = parseInt(lastUser.userId || 126325);
       userId = lastUserId + 1;
     } else {
-      userId = 1;
+      userId = 126325;
     }
 
     const newUser = new userModel({
@@ -4688,10 +4765,10 @@ export const SignupNewUser = async (req, res) => {
 
     if (lastUser) {
       // Convert lastOrder.orderId to a number before adding 1
-      const lastUserId = parseInt(lastUser.userId || 0);
+      const lastUserId = parseInt(lastUser.userId || 126325);
       userId = lastUserId + 1;
     } else {
-      userId = 1;
+      userId = 126325;
     }
     // Create a new user
     const user = new userModel({ phone, userId, status: 1 });
@@ -4895,6 +4972,12 @@ export const AuthUserByID = async (req, res) => {
     const existingUser = await userModel.findById(id);
 
     if (existingUser) {
+      if (existingUser.status === 2) {
+        return res.status(200).send({
+          success: false,
+          message: "Account Suspended",
+        });
+      }
       // Increment the login count
       existingUser.loginCount = (existingUser.loginCount || 0) + 1; // Initialize if undefined
       await existingUser.save(); // Save the updated user document
@@ -7134,6 +7217,7 @@ export const AddEmployeeLeadController = async (req, res) => {
       typeRange,
       traveller,
       EmployeeId,
+      source,
     } = req.body;
 
     // Validation
@@ -7184,6 +7268,7 @@ export const AddEmployeeLeadController = async (req, res) => {
       typeRange,
       traveller,
       EmployeeId,
+      source,
     });
 
     await newLead.save();

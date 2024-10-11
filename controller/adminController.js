@@ -2977,6 +2977,7 @@ export const AddAdminLeadController = async (req, res) => {
       type,
       typeRange,
       traveller,
+      source,
     } = req.body;
 
     // Validation
@@ -3026,6 +3027,7 @@ export const AddAdminLeadController = async (req, res) => {
       type,
       typeRange,
       traveller,
+      source,
     });
     await newLead.save();
 
