@@ -170,6 +170,9 @@ const userSchema = mongoose.Schema(
     Local: {
       type: Number,
     },
+    loginCount: {
+      type: Number,
+    },
   },
   { timestamps: true }
 );

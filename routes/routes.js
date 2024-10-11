@@ -238,8 +238,8 @@ const router = express.Router();
 function checkOrigin(req, res, next) {
   const allowedOrigins = [
     "http://localhost:5173",
-    "https://travelintrip.com",
-    "https://travelintrip.com/",
+    "https://travelleads.in",
+    "https://www.travelleads.in",
   ]; // Add your authorized domains here
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {

@@ -4895,6 +4895,10 @@ export const AuthUserByID = async (req, res) => {
     const existingUser = await userModel.findById(id);
 
     if (existingUser) {
+      // Increment the login count
+      existingUser.loginCount = (existingUser.loginCount || 0) + 1; // Initialize if undefined
+      await existingUser.save(); // Save the updated user document
+
       return res.status(200).json({
         success: true,
         message: "login sucesssfully with password",
