@@ -3130,7 +3130,11 @@ export const getAllLeadsAdmin = async (req, res) => {
       .sort({ _id: -1 }) // Sort by _id in descending order
       .skip(skip)
       .limit(limit)
-      .lean(); // Convert documents to plain JavaScript objects
+      .lean()
+      .populate({
+        path: "BuyId", // The field to populate
+        select: "phone username email", // Only select the phone and name fields from the User model
+      });
 
     if (!leads || leads.length === 0) {
       // Check if no users found

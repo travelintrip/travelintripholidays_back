@@ -675,14 +675,16 @@ export const userByLeadController = async (req, res) => {
   try {
     const totalLeadsCount = await buyModel
       .find({ userId: buyIdObjectId })
-      .populate("leadId"); // Replace with actual field names to populate;
+      .populate("leadId")
+      .sort({ createdAt: -1 });
 
     // Query to find leads by BuyId
     const leads = await buyModel
       .find({ userId: buyIdObjectId })
       .skip(skipNumber)
       .limit(limitNumber)
-      .populate("leadId"); // Replace with actual field names to populate
+      .populate("leadId")
+      .sort({ createdAt: -1 }); // Sort by creation date in descending order
 
     // Filter out any leads where leadId could not be populated
     const filteredLeads = leads.filter((lead) => lead.leadId !== null);
@@ -4694,7 +4696,7 @@ export const SignupLoginUser = async (req, res) => {
         if (existingUser.status === 0) {
           return res.status(400).json({
             success: false,
-            message: "An error occurred. Please contact support.",
+            message: "Your account status is pending. Please contact support.",
           });
         } else if (existingUser.status === 2) {
           return res.status(400).json({
@@ -5162,6 +5164,50 @@ export const updateCompanyUser = async (req, res) => {
     return res.status(200).json({
       success: true,
       updatedUser,
+    });
+  } catch (error) {
+    console.error("Error while updating profile:", error);
+    return res.status(400).json({
+      success: false,
+      message: `Error while updating profile: ${error.message}`,
+      error: error.message,
+    });
+  }
+};
+
+export const updatePasswordUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill all fields",
+      });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    // Prepare update fields
+    let updateFields = {
+      password: hashedPassword,
+    };
+
+    // Perform database update
+    const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      updatedUser,
+      message: "Password Updated Sucessfully",
     });
   } catch (error) {
     console.error("Error while updating profile:", error);

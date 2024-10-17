@@ -143,6 +143,7 @@ import {
   AuthUserByPhone,
   updateProfileUser,
   updateCompanyUser,
+  updatePasswordUser,
   updateKycUser,
   UpdateKycImage,
   SignupNewUser,
@@ -540,6 +541,8 @@ router.put("/update-user/:id", updateUserController);
 router.put("/update-profile/:id", profileUserImage, updateProfileUser);
 
 router.put("/update-company-profile/:id", updateCompanyUser);
+router.put("/update-password/:id", updatePasswordUser);
+
 router.put("/update-kyc-profile/:id", UpdateKycImage, updateKycUser);
 
 router.post("/create-blog", createBlogController);
