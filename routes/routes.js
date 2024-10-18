@@ -699,6 +699,6 @@ router.get("/send-otp-aisensy/:phone/", checkOrigin, sendAisensyOTP);
 router.post("/user/add-leads", AddUserLeadController);
 
 router.post("/download-invoice", downloadUserInvoice);
-router.post("/auth/google/callback", loginwithgoogle);
+router.get("/auth/google/callback", loginwithgoogle);
 
 export default router;

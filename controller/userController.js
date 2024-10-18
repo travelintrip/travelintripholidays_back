@@ -342,7 +342,7 @@ export const userBuyLeadController = async (req, res) => {
     const transaction = new transactionModel({
       userId: BuyId, // Use BuyId instead of lead.BuyId
       type: 1,
-      note: `Lead Id #${leadId} Purchase by user`,
+      note: `Lead Id #${lead?.LeadId} Purchase by user`,
       amount: -lead.CPC,
       t_id,
       t_no: lastTransId,
@@ -5009,6 +5009,7 @@ export const AuthUserByID = async (req, res) => {
           AadhaarBack: existingUser?.AadhaarBack,
           AadhaarFront: existingUser?.AadhaarFront,
           Local: existingUser?.Local,
+          password: existingUser?.password ? true : false,
         },
       });
 
@@ -5122,7 +5123,16 @@ export const updateProfileUser = async (req, res) => {
 export const updateCompanyUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { c_name, address, city, state, pincode, gstin } = req.body;
+    const {
+      c_name,
+      address,
+      city,
+      state,
+      pincode,
+      gstin,
+      password,
+      passwordType,
+    } = req.body;
 
     console.log(c_name, address, city, state, pincode, gstin);
     console.log(req.body);
@@ -5138,16 +5148,33 @@ export const updateCompanyUser = async (req, res) => {
       });
     }
 
-    // Prepare update fields
-    let updateFields = {
-      c_name,
-      address,
-      city,
-      state,
-      pincode,
-      gstin,
-      Local: statetax,
-    };
+    let updateFields = {};
+
+    if (!passwordType) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      updateFields = {
+        c_name,
+        address,
+        city,
+        state,
+        pincode,
+        gstin,
+        Local: statetax,
+        password: hashedPassword,
+      };
+    } else {
+      // Prepare update fields
+      updateFields = {
+        c_name,
+        address,
+        city,
+        state,
+        pincode,
+        gstin,
+        Local: statetax,
+      };
+    }
 
     // Perform database update
     const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
@@ -5275,6 +5302,9 @@ export const updateKycUser = async (req, res) => {
         .replace(/\\/g, "/")
         .replace(/^public\//, ""); // Normalize path
     }
+
+    updateFields.verified = 2;
+
     console.log("updateFields", updateFields); // This should now display the correct updateFields object
 
     const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
@@ -7607,35 +7637,25 @@ export const downloadUserInvoice = async (req, res) => {
 };
 
 export const loginwithgoogle = async (req, res) => {
-  const { idToken } = req.body;
-
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID, // Specify the CLIENT_ID of the app that accesses the backend
-  });
-
-  const { sub: googleId, email, name } = ticket.getPayload();
-
   try {
-    let user = await userModel.findOne({ googleId });
-    if (!user) {
-      user = await userModel.create({
-        googleId,
-        email,
-        name,
+    const { email } = req.query; // Change to req.query to access query parameters
+    if (!email) {
+      return res.status(401).json({
+        success: false,
+        message: "Email is required",
       });
     }
-
-    // Generate token for the session (optional)
-    const token = jwt.sign({ userId: user._id }, secretKey, {
-      expiresIn: "1h",
-    });
-
+    const existingUser = await userModel.findOne({ email });
+    if (!existingUser) {
+      return res.status(401).json({
+        success: false,
+        message: "User Not Found!, Please Signup With Mobile Number",
+      });
+    }
     return res.status(200).send({
       success: true,
       message: "Login successfully",
-      user,
-      token,
+      existingUser,
     });
   } catch (error) {
     return res.status(500).send({
