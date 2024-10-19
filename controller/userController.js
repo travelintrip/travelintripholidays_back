@@ -5065,7 +5065,7 @@ export const AuthUserByPhone = async (req, res) => {
 export const updateProfileUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, password } = req.body;
+    const { username, email, password, passwordType } = req.body;
     const profile = req.files ? req.files.profile : undefined;
 
     if (!username || !email) {
@@ -5086,7 +5086,7 @@ export const updateProfileUser = async (req, res) => {
     }
 
     // Update password if provided
-    if (password) {
+    if (password && !passwordType) {
       const hashedPassword = await bcrypt.hash(password, 10);
       updateFields.password = hashedPassword;
     }
@@ -5104,7 +5104,7 @@ export const updateProfileUser = async (req, res) => {
     }
 
     // Return success message based on the operation performed
-    const successMessage = password ? "Password updated!" : "Profile updated!";
+    const successMessage = password ? "Profile updated!" : "Profile updated!";
     return res.status(200).json({
       success: true,
       message: successMessage,
