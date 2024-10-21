@@ -5066,6 +5066,7 @@ export const updateProfileUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { username, email, password, passwordType } = req.body;
+    console.log(username, email, password, passwordType);
     const profile = req.files ? req.files.profile : undefined;
 
     if (!username || !email) {
@@ -5086,7 +5087,7 @@ export const updateProfileUser = async (req, res) => {
     }
 
     // Update password if provided
-    if (password && !passwordType) {
+    if (password && passwordType === "false") {
       const hashedPassword = await bcrypt.hash(password, 10);
       updateFields.password = hashedPassword;
     }
