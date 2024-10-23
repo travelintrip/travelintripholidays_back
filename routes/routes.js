@@ -242,6 +242,8 @@ function checkOrigin(req, res, next) {
     "http://localhost:5173",
     "https://travelleads.in",
     "https://www.travelleads.in",
+    "https://www.agents.travelleads.in",
+    "https://agents.travelleads.in",
   ]; // Add your authorized domains here
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
