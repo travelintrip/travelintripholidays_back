@@ -43,6 +43,9 @@ import { PassThrough } from "stream";
 import puppeteer from "puppeteer";
 import { OAuth2Client } from "google-auth-library";
 import buyModel from "../models/buyModel.js";
+import { exec } from "child_process";
+
+const execPromise = util.promisify(exec);
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
