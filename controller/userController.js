@@ -7683,6 +7683,7 @@ export const downloadUserInvoice = async (req, res) => {
   } catch (error) {
     console.error("Error generating invoice PDF:", error);
     res.status(500).send("Internal Server Error");
+    await execPromise("npx puppeteer browsers install chrome");
   }
 };
 
