@@ -43,11 +43,6 @@ import { PassThrough } from "stream";
 import puppeteer from "puppeteer";
 import { OAuth2Client } from "google-auth-library";
 import buyModel from "../models/buyModel.js";
-import util from "util";
-
-import { exec } from "child_process";
-
-const execPromise = util.promisify(exec);
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -7688,7 +7683,6 @@ export const downloadUserInvoice = async (req, res) => {
   } catch (error) {
     console.error("Error generating invoice PDF:", error);
     res.status(500).send("Internal Server Error");
-    await execPromise("npx puppeteer browsers install chrome");
   }
 };
 
