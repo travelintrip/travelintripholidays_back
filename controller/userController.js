@@ -43,6 +43,10 @@ import { PassThrough } from "stream";
 import puppeteer from "puppeteer";
 import { OAuth2Client } from "google-auth-library";
 import buyModel from "../models/buyModel.js";
+import { exec } from "child_process";
+import util from "util";
+
+const execPromise = util.promisify(exec);
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -7495,8 +7499,13 @@ export const getAllLeadsEmployee = async (req, res) => {
 const generateUserInvoicePDF = async (invoiceData) => {
   // console.log(invoiceData);
 
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({
+    headless: true, // Ensure headless mode (no GUI)
+    userDataDir: "/tmp/puppeteer", // Ensure a writable user data directory for cloud environments
+  });
+
   const page = await browser.newPage();
+
   const gstRate = 0.18;
 
   const totalWithGST = invoiceData.totalAmount;
@@ -7574,7 +7583,9 @@ const generateUserInvoicePDF = async (invoiceData) => {
         <tbody>
  
             <tr>
-              <td> IT Service Fees</td>
+              <td> IT Service Fees <br>
+              Order Id : ${invoiceData.razorpay_order_id}
+              </td>
              
               <td> ₹${parseFloat(amountWithoutGST.toFixed(2))}</td>
             </tr>
@@ -7681,6 +7692,8 @@ export const downloadUserInvoice = async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdfBuffer);
   } catch (error) {
+    await execPromise("npx puppeteer browsers install chrome");
+
     console.error("Error generating invoice PDF:", error);
     res.status(500).send("Internal Server Error");
   }
