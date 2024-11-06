@@ -7631,7 +7631,7 @@ const generateUserInvoicePDF = async (invoiceData) => {
 " > </p>
               Order Id : <b> ${invoiceData.razorpay_order_id} </b>
            <br>
-           <p>AC Code: 998314 </p>
+           <p>SAC Code: 998314 </p>
               </td>
              
               <td style="text-align: right;" colspan="2"  >     
