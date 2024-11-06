@@ -226,6 +226,7 @@ import {
   downloadUserInvoice,
   loginwithgoogle,
   userByLeadController,
+  generateUserInvoicePDFView,
   // AddUserLeadController
 } from "../controller/userController.js";
 import authenticateToken from "../middleware/authMiddleware.js";
@@ -283,10 +284,12 @@ router.post("/admin/add-leads", AddAdminLeadController);
 router.get("/admin/all-leads", getAllLeadsAdmin);
 router.delete("/admin/delete-lead/:id", deleteLeadAdmin);
 
-router.get("/admin/get-lead/:id", GetLeadByIDAdmin);
-router.put("/admin/update-lead/:id", updateLeadAdmin);
+router.get("/admin/get-lead/:id", checkOrigin, GetLeadByIDAdmin);
+router.put("/admin/update-lead/:id", checkOrigin, updateLeadAdmin);
 
-router.get("/admin/all-payments", getAllPaymentsAdmin);
+router.get("/admin/all-payments", checkOrigin, getAllPaymentsAdmin);
+router.get("/last-invoice", generateUserInvoicePDFView);
+
 // router.get("/admin/all-reports", getAllReportsAdmin);
 router.get("/admin/all-dashboard", AdminAllLeadsDasboard);
 
@@ -427,8 +430,8 @@ router.post(
 
 // for export admin
 
-router.get("/admin/export/allproducts/", exportAllProAdmin);
-router.post("/admin/import/allproducts/", importAllProAdmin);
+router.get("/admin/export/allproducts/", checkOrigin, exportAllProAdmin);
+router.post("/admin/import/allproducts/", checkOrigin, importAllProAdmin);
 
 router.post("/admin/update-wallet", checkOrigin, AdminUpdateWallet);
 
