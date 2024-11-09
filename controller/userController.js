@@ -5196,7 +5196,7 @@ export const updateCompanyUser = async (req, res) => {
     if (mystate && mystate.primary === 1) {
       statetax = 1;
     }
-    if (!c_name || !address || !city || !state || !pincode || !gstin) {
+    if (!c_name || !address || !city || !state || !pincode) {
       return res.status(400).json({
         success: false,
         message: "Please fill all fields",
