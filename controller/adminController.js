@@ -41,6 +41,7 @@ import transactionModel from "../models/transactionModel.js";
 import CryptoJS from "crypto-js"; // Import the crypto module
 import LeadModel from "../models/LeadModel.js";
 import moment from "moment";
+import paymentModel from "../models/paymentModel.js";
 
 const encrypt = (data, key) => {
   const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(data), key).toString();
@@ -3342,6 +3343,84 @@ export const getAllPaymentsAdmin = async (req, res) => {
   }
 };
 
+// for payment invoice
+
+export const getAllPaymentsInvoiceAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1; // Current page, default is 1
+    const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
+    const searchTerm = req.query.search || ""; // Get search term from the query parameters
+    const type = 1;
+    // Get startDate and endDate from query parameters
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate)
+      : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
+
+      // Add regex pattern to search both username and email fields for the full name
+      query.$or = [
+        { name: regex },
+        // { email: regex },
+        // { phone: regex } // Add phone number search if needed
+      ];
+    }
+
+    // Add date range filtering to the query
+    if (startDate && endDate) {
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      query.createdAt = { $gte: startDate };
+    } else if (endDate) {
+      query.createdAt = { $lte: endDate };
+    }
+    query.payment = { $in: type }; // Use $in operator to match any of the values in the array
+
+    const totalData = await paymentModel.countDocuments(query); // Count total documents matching the query
+    const data = await paymentModel
+      .find(query)
+      .sort({ _id: -1 }) // Sort by _id in descending order
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "userId", // The field to populate
+        select: "phone username statename", // Only select the phone and name fields from the User model
+      })
+      .lean(); // Convert documents to plain JavaScript objects
+
+    if (!data || data.length === 0) {
+      // Check if no users found
+      return res.status(400).send({
+        // Send 404 Not Found response
+        message: "No data found",
+        success: false,
+      });
+    }
+
+    return res.status(200).send({
+      // Send successful response
+      message: "All data list",
+      Count: data.length,
+      currentPage: page,
+      totalPages: Math.ceil(totalData / limit),
+      success: true,
+      data: encrypt(data, process.env.APIKEY), // Return users array
+    });
+  } catch (error) {
+    return res.status(500).send({
+      // Send 500 Internal Server Error response
+      message: `Error while getting data: ${error.message}`,
+      success: false,
+      error,
+    });
+  }
+};
+
 // for Reports
 
 export const getAllReportsAdmin = async (req, res) => {
@@ -4806,6 +4885,116 @@ export const exportTransUserAdmin = async (req, res) => {
 
     // Stringify the product data
     stringify(transaction, { header: true }, (err, csvString) => {
+      if (err) {
+        console.error("Error generating CSV:", err);
+        res.status(500).send("Internal Server Error");
+        return;
+      }
+
+      // Set response headers
+      res.header("Content-Type", "text/csv");
+      res.attachment(filename);
+
+      // Send CSV data
+      res.send(csvString);
+    });
+  } catch (error) {
+    console.error("Error exporting payments:", error);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
+export const exportTransUserInvoiceAdmin = async (req, res) => {
+  console.log("exportTransUserInvoiceAdmin");
+
+  try {
+    const searchTerm = req.query.search || ""; // Get search term from the query parameters
+    const type = 1;
+    // Get startDate and endDate from query parameters
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate)
+      : null;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+
+    const query = {};
+
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, "i"); // Case-insensitive regex pattern for the search term
+
+      // Add regex pattern to search both username and email fields for the full name
+      query.$or = [{ paymentId: float(regex) }, { note: regex }];
+    }
+
+    // Add date range filtering to the query
+    if (startDate && endDate) {
+      query.createdAt = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      query.createdAt = { $gte: startDate };
+    } else if (endDate) {
+      query.createdAt = { $lte: endDate };
+    }
+    query.payment = { $in: type }; // Use $in operator to match any of the values in the array
+
+    // Fetch data from the database and populate user data (assuming userId is a reference to the User model)
+    const transaction = await paymentModel
+      .find(
+        query,
+        "paymentId razorpay_order_id totalAmount createdAt userId payment"
+      )
+      .sort({ _id: -1 })
+      .populate("userId", "username statename Local") // Populating userId with username and statename fields
+      .lean();
+
+    // Format the date properly
+    const formatDate = (dateString) => {
+      const options = { year: "numeric", month: "short", day: "numeric" };
+      return new Date(dateString).toLocaleDateString("en-US", options);
+    };
+    console.log(transaction.length);
+
+    const formattedTransaction = transaction.map((tran) => {
+      // Ensure userId is populated, if not return empty strings
+      const user = tran.userId || {}; // Default to an empty object if userId is null or undefined
+
+      // Calculating GST-related fields
+      const gstRate = 0.18;
+      const totalWithGST = tran.totalAmount;
+      const amountWithoutGST = totalWithGST / (1 + gstRate);
+      const CSGT = totalWithGST - amountWithoutGST;
+      const TotalLocal = CSGT / 2;
+
+      // Return the formatted data object with string formatting for decimals
+      return {
+        paymentId: tran.paymentId,
+        razorpay_order_id: tran.razorpay_order_id,
+        totalAmount: tran.totalAmount,
+        createdAt: formatDate(tran.createdAt),
+        VendorName: user.username || "", // Accessing populated username (default to empty string if null)
+        statename: user.statename || "", // Accessing populated statename (default to empty string if null)
+        amountWithoutGST: parseFloat(amountWithoutGST).toFixed(2), // Ensuring 2 decimal places
+        IGST:
+          user.Local === 1
+            ? parseFloat(tran.totalAmount - amountWithoutGST).toFixed(2)
+            : "0", // Ensuring 2 decimal places for IGST
+        CGST:
+          user.Local === 0
+            ? parseFloat(TotalLocal).toFixed(2)
+            : user.Local !== 0 && user.Local !== 1
+            ? parseFloat(TotalLocal).toFixed(2)
+            : "0", // Ensuring 2 decimal places for CGST
+        SGST:
+          user.Local === 0
+            ? parseFloat(TotalLocal).toFixed(2)
+            : user.Local !== 0 && user.Local !== 1
+            ? parseFloat(TotalLocal).toFixed(2)
+            : "0", // Ensuring 2 decimal places for SGST
+      };
+    });
+
+    const filename = "all_payments_invoice.csv";
+
+    // Stringify the formatted transaction data to CSV
+    stringify(formattedTransaction, { header: true }, (err, csvString) => {
       if (err) {
         console.error("Error generating CSV:", err);
         res.status(500).send("Internal Server Error");

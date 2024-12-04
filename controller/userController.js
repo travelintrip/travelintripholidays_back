@@ -7691,9 +7691,9 @@ Thanks You for your payment
               <b>   ${(() => {
                 if (invoiceData.Local === 1) {
                   return `
-             <p> <b> Rs. ${TotalLocal}  </b>     <p>
+             <p> <b> Rs. ${TotalLocal.toFixed(2)}  </b>     <p>
              <hr/>
-                   <p> <b> Rs. ${TotalLocal}   </b>  <p>
+                   <p> <b> Rs. ${TotalLocal.toFixed(2)}   </b>  <p>
              `;
                 } else if (invoiceData.Local === 0) {
                   return ` 
@@ -8073,6 +8073,30 @@ export const downloadUserInvoice = async (req, res) => {
   try {
     const { invoiceId } = req.body; // Assuming invoiceData is sent in the request body
     if (!invoiceId) {
+      return res.status(400).send("Invoice ID is required");
+    }
+    // Fetch invoice data from the database
+    const invoiceData = await paymentModel
+      .findById(invoiceId)
+      .populate("userId");
+
+    const pdfBuffer = await generateUserInvoicePDF(invoiceData);
+
+    res.setHeader("Content-Disposition", "attachment; filename=invoice.pdf");
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdfBuffer);
+  } catch (error) {
+    await execPromise("npx puppeteer browsers install chrome");
+
+    console.error("Error generating invoice PDF:", error);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
+export const downloadAdminInvoice = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+     if (!invoiceId) {
       return res.status(400).send("Invoice ID is required");
     }
     // Fetch invoice data from the database

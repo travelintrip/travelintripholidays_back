@@ -84,9 +84,11 @@ import {
   getAllLeadsAdmin,
   deleteLeadAdmin,
   getAllPaymentsAdmin,
+  getAllPaymentsInvoiceAdmin,
   AdminAllLeadsDasboard,
   getAllReportsAdmin,
   exportTransUserAdmin,
+  exportTransUserInvoiceAdmin,
   editUserDetailAdmin,
   GetLeadByIDAdmin,
   updateLeadAdmin,
@@ -224,6 +226,7 @@ import {
   WalletKey,
   paymentverification,
   downloadUserInvoice,
+  downloadAdminInvoice,
   loginwithgoogle,
   userByLeadController,
   generateUserInvoicePDFView,
@@ -288,6 +291,12 @@ router.get("/admin/get-lead/:id", checkOrigin, GetLeadByIDAdmin);
 router.put("/admin/update-lead/:id", checkOrigin, updateLeadAdmin);
 
 router.get("/admin/all-payments", checkOrigin, getAllPaymentsAdmin);
+router.get(
+  "/admin/all-payments-invoice",
+  checkOrigin,
+  getAllPaymentsInvoiceAdmin
+);
+
 router.get("/last-invoice", generateUserInvoicePDFView);
 
 // router.get("/admin/all-reports", getAllReportsAdmin);
@@ -436,6 +445,12 @@ router.post("/admin/import/allproducts/", checkOrigin, importAllProAdmin);
 router.post("/admin/update-wallet", checkOrigin, AdminUpdateWallet);
 
 router.get("/admin/export/alltrans", checkOrigin, exportTransUserAdmin);
+
+router.get(
+  "/admin/export-invoice/alltrans",
+  checkOrigin,
+  exportTransUserInvoiceAdmin
+);
 
 // --------------------    user routes start  -------------------//
 
@@ -704,6 +719,13 @@ router.get("/send-otp-aisensy/:phone/", checkOrigin, sendAisensyOTP);
 router.post("/user/add-leads", AddUserLeadController);
 
 router.post("/download-invoice", downloadUserInvoice);
+
+router.get(
+  "/admin/download-invoice/:invoiceId/",
+  checkOrigin,
+  downloadAdminInvoice
+);
+
 router.get("/auth/google/callback", loginwithgoogle);
 
 export default router;
