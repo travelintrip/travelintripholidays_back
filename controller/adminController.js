@@ -3389,7 +3389,7 @@ export const getAllPaymentsInvoiceAdmin = async (req, res) => {
       .limit(limit)
       .populate({
         path: "userId", // The field to populate
-        select: "phone username statename gstin", // Only select the phone and name fields from the User model
+        select: "phone username statename gstin",
       })
       .lean(); // Convert documents to plain JavaScript objects
 
@@ -4942,7 +4942,7 @@ export const exportTransUserInvoiceAdmin = async (req, res) => {
         "paymentId razorpay_order_id totalAmount createdAt userId payment"
       )
       .sort({ _id: -1 })
-      .populate("userId", "username statename Local") // Populating userId with username and statename fields
+      .populate("userId", "username statename Local gstin") // Populating userId with username and statename fields
       .lean();
 
     // Format the date properly
@@ -4972,6 +4972,7 @@ export const exportTransUserInvoiceAdmin = async (req, res) => {
         VendorName: user.username || "", // Accessing populated username (default to empty string if null)
         statename: user.statename || "", // Accessing populated statename (default to empty string if null)
         amountWithoutGST: parseFloat(amountWithoutGST).toFixed(2), // Ensuring 2 decimal places
+        gstin: gstin ? gstin : "Not Found",
         IGST:
           user.Local === 1
             ? parseFloat(tran.totalAmount - amountWithoutGST).toFixed(2)
