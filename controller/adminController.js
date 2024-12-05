@@ -4972,7 +4972,7 @@ export const exportTransUserInvoiceAdmin = async (req, res) => {
         VendorName: user.username || "", // Accessing populated username (default to empty string if null)
         statename: user.statename || "", // Accessing populated statename (default to empty string if null)
         amountWithoutGST: parseFloat(amountWithoutGST).toFixed(2), // Ensuring 2 decimal places
-        gstin: gstin ? gstin : "Not Found",
+        gstin: user.gstin ? user.gstin : "Not Found",
         IGST:
           user.Local === 1
             ? parseFloat(tran.totalAmount - amountWithoutGST).toFixed(2)
