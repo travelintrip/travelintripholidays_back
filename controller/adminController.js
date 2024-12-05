@@ -3389,7 +3389,7 @@ export const getAllPaymentsInvoiceAdmin = async (req, res) => {
       .limit(limit)
       .populate({
         path: "userId", // The field to populate
-        select: "phone username statename", // Only select the phone and name fields from the User model
+        select: "phone username statename gstin", // Only select the phone and name fields from the User model
       })
       .lean(); // Convert documents to plain JavaScript objects
 
