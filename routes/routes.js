@@ -222,9 +222,9 @@ import {
   AddEmployeeLeadController,
   getAllLeadsEmployee,
   profileUserImage,
-  CheckoutWallet,
+  CheckoutWallet, CheckoutWallet_phonepay,
   WalletKey,
-  paymentverification,
+  paymentverification,paymentverificationPhonepay,
   downloadUserInvoice,
   downloadAdminInvoice,
   loginwithgoogle,
@@ -545,6 +545,10 @@ router.get("/get-notification/:userId/", checkOrigin, GetUserNotification);
 router.post("/add-wallet", checkOrigin, AddWallet);
 router.post("/checkout-wallet", checkOrigin, CheckoutWallet);
 router.post("/paymentverification-wallet", paymentverification);
+
+router.post("/checkout-wallet-phonepay", checkOrigin, CheckoutWallet_phonepay);
+
+router.post("/paymentverification-wallet-phonepay", paymentverificationPhonepay);
 
 router.get("/api/get-key", checkOrigin, WalletKey);
 
