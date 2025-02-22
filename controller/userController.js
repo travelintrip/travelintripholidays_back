@@ -1373,6 +1373,146 @@ export const CheckoutWallet = async (req, res) => {
     order,
   });
 };
+export const CheckoutWallet_phonepay = async (req, res) => {
+  const PHONEPE_CALLBACK_URL = `${process.env.LIVEWEB}/paymentverification-wallet-phonepay`;
+
+  try {
+    const { amount, userId, note, Local } = req.body;
+
+    // Calculate GST and final amount
+    const gstRate = 0.18;
+    const startAmount = amount * gstRate;
+    const finalAmount = amount + startAmount;
+
+    // Generate a unique transaction ID
+    const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+    // Create the payload for PhonePe API request
+    const payload = {
+      merchantId: process.env.PHONEPE_MERCHANT_ID,
+      transactionId: transactionId,
+      amount: finalAmount * 100, // Convert to paise
+      merchantUserId: userId,
+      redirectUrl: PHONEPE_CALLBACK_URL,
+      callbackUrl: PHONEPE_CALLBACK_URL,
+      paymentInstrument: {
+        type: "PAY_PAGE",
+      },
+    };
+
+    // Stringify and encode the payload to base64
+    const payloadString = JSON.stringify(payload);
+    const checksum = crypto
+      .createHmac('sha256', process.env.PHONEPE_SALT_KEY)
+      .update(payloadString)
+      .digest('hex');
+    const finalXHeader = `${checksum}###1`;  // Add saltIndex (1) as per PhonePe documentation
+
+    const finalData = {
+      request: Buffer.from(payloadString).toString('base64'),
+      checksum: checksum,
+    };
+
+    // Store the payment details in DB
+    const payment = await new paymentModel({
+      totalAmount: finalAmount,
+      userId: userId,
+      transactionId: transactionId,
+      note: note,
+      Local: Local,
+      paymentStatus: 'PENDING',
+    });
+
+    await payment.save();
+
+    // Prepare the data for axios request
+    const phonePeApiUrl = `${process.env.PHONEPE_BASE_URL}/pg/v1/pay`;
+
+    const axiosData = {
+      request: finalData.request,
+    };
+
+    // Use axios to make the POST request to PhonePe API
+    const response = await axios.post(phonePeApiUrl, axiosData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-VERIFY': finalXHeader,  // Use the correct X-VERIFY header
+        'Accept': 'application/json',
+      },
+    });
+
+    // Log the full response to debug
+    console.log('PhonePe API Response:', response.data);
+
+    // Check if the redirect URL is available in the response
+    if (
+      response.data &&
+      response.data.data &&
+      response.data.data.instrumentResponse &&
+      response.data.data.instrumentResponse.redirectInfo
+    ) {
+      const redirectUrl = response.data.data.instrumentResponse.redirectInfo.url;
+      return res.status(200).json({ success: true, redirectUrl });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: 'No redirect URL found in response',
+        errorDetails: response.data,  // Include the full response for debugging
+      });
+    }
+
+  } catch (error) {
+    console.error('PhonePe Payment Error:', error);
+    return res.status(500).json({ success: false, message: 'Payment initiation failed' });
+  }
+};
+
+export const paymentverificationPhonepay = async (req, res) => {
+  try {
+    const { transactionId } = req.query;
+
+    const url = `${process.env.PHONEPE_BASE_URL}/pg/v1/status/${process.env.PHONEPE_MERCHANT_ID}/${transactionId}`;
+    const checksum = crypto
+      .createHmac("sha256", process.env.PHONEPE_SALT_KEY)
+      .update(`/pg/v1/status/${process.env.PHONEPE_MERCHANT_ID}/${transactionId}`)
+      .digest("hex");
+
+    const response = await axios.get(url, {
+      headers: { "X-VERIFY": `${checksum}###1` },
+    });
+
+    if (response.data.success && response.data.code === "PAYMENT_SUCCESS") {
+      const payment = await paymentModel.findOneAndUpdate(
+        { transactionId },
+        {
+          paymentStatus: "SUCCESS",
+          paymentId: response.data.data.transactionId,
+        },
+        { new: true }
+      );
+
+      // Add the wallet balance
+      const gstRate = 0.18;
+      const baseAmount = payment.totalAmount / (1 + gstRate);
+      const finalAmount = baseAmount.toFixed(2);
+
+      await AddWalletPayment(payment.userId, 0, payment.note, finalAmount);
+
+      res.redirect(`${process.env.LIVEWEB}/paymentsuccess?reference=${transactionId}`);
+    } else {
+      await paymentModel.findOneAndUpdate(
+        { transactionId },
+        { paymentStatus: "FAILED" },
+        { new: true }
+      );
+
+      res.status(400).json({ success: false, message: "Payment failed" });
+    }
+  } catch (error) {
+    console.error("PhonePe Verification Error:", error);
+    res.status(500).json({ success: false, message: "Payment verification failed" });
+  }
+};
 
 export const paymentverification = async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
