@@ -248,6 +248,7 @@ function checkOrigin(req, res, next) {
     "https://www.travelleads.in",
     "https://agents.travelleads.in",
     "https://www.agents.travelleads.in",
+    "https://test.travelleads.in",
   ]; // Add your authorized domains here
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
