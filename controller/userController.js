@@ -1376,80 +1376,81 @@ export const CheckoutWallet = async (req, res) => {
   });
 };
 
+import axios from 'axios';
+import sha256 from 'crypto-js/sha256'; // Ensure sha256 is imported
+import uniqid from 'uniqid'; // Ensure uniqid is imported
+
 export const CheckoutWallet_phonepay = async (req, res) => {
   const PHONEPE_CALLBACK_URL = `${process.env.BACKWEB}paymentverification-wallet-phonepay`;
-  const PHONE_PE_HOST_URL = process.env.PHONE_PE_HOST_URL ;
-  const SALT_KEY  = process.env.PHONEPE_SALT_KEY ;
-  const SALT_INDEX  = process.env.PHONEPE_SALT_INDEX ;
-  const PHONEPE_MERCHANT_ID  = process.env.PHONEPE_MERCHANT_ID ;
+  const PHONE_PE_HOST_URL = process.env.PHONE_PE_HOST_URL;
+  const SALT_KEY = process.env.PHONEPE_SALT_KEY;
+  const SALT_INDEX = process.env.PHONEPE_SALT_INDEX;
+  const PHONEPE_MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
 
   try {
     const { amount, userId, note, Local } = req.body;
+
+    // Ensure amount is a valid number
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
 
     const gstRate = 0.18;
     const startAmount = amount * gstRate;
     const finalAmount = amount + startAmount;
 
     // Generate Transaction ID
-    
-    //  const transactionId = uniqid();
-     const transactionId = `order_${uniqid()}`;
+    const transactionId = `order_${uniqid()}`;
 
+    // Create normal payload
     const normalPayLoad = {
       merchantId: PHONEPE_MERCHANT_ID,
       merchantTransactionId: transactionId,
-      merchantUserId:userId,
-      amount: finalAmount * 100,  // Convert amount to paise
+      merchantUserId: userId,
+      amount: finalAmount * 100, // Convert amount to paise
       redirectUrl: `${PHONEPE_CALLBACK_URL}/${transactionId}`,
       redirectMode: "REDIRECT",
       callbackUrl: PHONEPE_CALLBACK_URL,
-      mobileNumber: "9999999999",
+      mobileNumber: "9999999999", // Should ideally come from req.body or be a valid number
       paymentInstrument: {
         type: "PAY_PAGE",
       },
     };
 
-  
-     // Make a base64-encoded payload
- let bufferObj = Buffer.from(JSON.stringify(normalPayLoad), "utf8");
- let base64EncodedPayload = bufferObj.toString("base64");
+    // Base64 encode the payload
+    let bufferObj = Buffer.from(JSON.stringify(normalPayLoad), "utf8");
+    let base64EncodedPayload = bufferObj.toString("base64");
 
- // X-VERIFY => SHA256(base64EncodedPayload + "/pg/v1/pay" + SALT_KEY) + ### + SALT_INDEX
- let string = base64EncodedPayload + "/pg/v1/pay" + SALT_KEY;
- let sha256_val = sha256(string);
- let xVerifyChecksum = sha256_val + "###" + SALT_INDEX;
+    // X-VERIFY checksum generation
+    let string = base64EncodedPayload + "/pg/v1/pay" + SALT_KEY;
+    let sha256_val = sha256(string).toString();
+    let xVerifyChecksum = sha256_val + "###" + SALT_INDEX;
 
-  // Calculate the auto-increment ID
-  const lastLead = await paymentModel.findOne().sort({ _id: -1 }).limit(1);
-  let paymentId;
+    // Get the auto-increment payment ID
+    const lastLead = await paymentModel.findOne().sort({ _id: -1 }).limit(1);
+    let paymentId;
 
-  if (lastLead) {
-    if (lastLead.paymentId === undefined) {
-      paymentId = 1;
+    if (lastLead) {
+      paymentId = lastLead.paymentId ? parseInt(lastLead.paymentId) + 1 : 1;
     } else {
-      // Convert lastOrder.orderId to a number before adding 1
-      const lastOrderId = parseInt(lastLead.paymentId);
-      paymentId = lastOrderId + 1;
+      paymentId = 1;
     }
-  } else {
-    paymentId = 1;
-  }
 
-
-    // Store the payment details in DB
-    const payment = await new paymentModel({
-      paymentId:paymentId,
+    // Store the payment details in the database
+    const payment = new paymentModel({
+      paymentId: paymentId,
       totalAmount: finalAmount,
       userId: userId,
-       note: note,
+      note: note,
       Local: Local,
       paymentStatus: "PENDING",
       payment: 0,
-      razorpay_order_id: transactionId
+      razorpay_order_id: transactionId,
     });
 
-   await payment.save();
- 
+    await payment.save();
+
+    // Make the API request to PhonePe
     const response = await axios.post(
       `${PHONE_PE_HOST_URL}/pg/v1/pay`,
       { request: base64EncodedPayload },
@@ -1462,18 +1463,25 @@ export const CheckoutWallet_phonepay = async (req, res) => {
       }
     );
 
-    // Get the payment URL from the response
-    const paymentUrl = response.data.data.instrumentResponse.redirectInfo.url;
- 
-
-    res.status(200).json({ success: true, paymentUrl });
-
-
+    // Check if response data contains the expected URL
+    if (response.data && response.data.data && response.data.data.instrumentResponse && response.data.data.instrumentResponse.redirectInfo) {
+      const paymentUrl = response.data.data.instrumentResponse.redirectInfo.url;
+      res.status(200).json({ success: true, paymentUrl });
+    } else {
+      throw new Error('Invalid response from PhonePe API');
+    }
   } catch (error) {
+    // Log normalPayLoad and base64EncodedPayload on error
     console.error("PhonePe Payment Error:", normalPayLoad, base64EncodedPayload);
-    res.status(500).json({ success: false, normalPayLoad, base64EncodedPayload ,message: `Payment initiation failed ${error}` });
+
+    // Send a generic error response
+    res.status(500).json({
+      success: false,
+      message: `Payment initiation failed: ${error.message}`,
+    });
   }
 };
+
 
 
 export const paymentverificationPhonepay_old = async (req, res) => {
