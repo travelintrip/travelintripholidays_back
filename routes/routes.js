@@ -92,6 +92,11 @@ import {
   editUserDetailAdmin,
   GetLeadByIDAdmin,
   updateLeadAdmin,
+  AddAdminScreen,
+	getAllScreenFillAdmin,
+	updateScreenAdmin,
+	getScreenIdAdmin,
+	deleteScreenAdmin,
 } from "../controller/adminController.js";
 import {
   SignupUserImage,
@@ -337,6 +342,13 @@ router.get("/admin/get-product/:id", getProductIdAdmin);
 router.put("/admin/update-product/:id", updateProductAdmin);
 router.delete("/admin/delete-product/:id", deleteProductAdmin);
 
+router.post("/admin/add-screen", AddAdminScreen);
+router.get("/admin/all-screen-fillter", getAllScreenFillAdmin);
+router.get("/admin/get-screen/:id", getScreenIdAdmin);
+router.put("/admin/update-screen/:id", updateScreenAdmin);
+router.delete("/admin/delete-screen/:id", deleteScreenAdmin);
+
+ 
 router.post("/admin/add-attribute", AddAdminAttributeController);
 router.get("/admin/all-attribute-fillter", getAllAttributeFillAdmin);
 router.get("/admin/get-attribute/:id", getAttributeIdAdmin);

@@ -42,6 +42,8 @@ import CryptoJS from "crypto-js"; // Import the crypto module
 import LeadModel from "../models/LeadModel.js";
 import moment from "moment";
 import paymentModel from "../models/paymentModel.js";
+import { start } from "repl";
+import screenModel from "../models/screenModel.js";
 
 const encrypt = (data, key) => {
   const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(data), key).toString();
@@ -1149,6 +1151,176 @@ export const deleteProductAdmin = async (req, res) => {
     });
   }
 };
+
+// Screen Module start
+
+export const AddAdminScreen = async (req, res) => {
+  try {
+    const {
+      image ,
+      URL ,
+      banners 
+    } = req.body;
+
+    // Validation
+    if (!image || !banners) {
+      return res.status(400).send({
+        success: false,
+        message: "Please Provide All Fields",
+      });
+    }
+  
+    // Create a new category with the specified parent
+    const newScreen = new screenModel({
+      image ,
+      URL ,
+      banners 
+    });
+
+    await newScreen.save();
+
+    return res.status(201).send({
+      success: true,
+      message: "Screen Added Success!",
+      newScreen,
+    });
+
+  } catch (error) {
+    console.error("Error while creating Screen:", error);
+    return res.status(400).send({
+      success: false,
+      message: "Error While Adding Screen",
+      error,
+    });
+  }
+};
+
+export const getAllScreenFillAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1; // Current page, default is 1
+    const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
+    const searchTerm = req.query.search || ""; // Get search term from the query parameters
+
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (searchTerm) {
+      // If search term is provided, add it to the query
+      query.$or = [
+        { banners: { $regex: searchTerm, $options: "i" } }, // Case-insensitive username search
+       ];
+    }
+
+    const totalProduct = await screenModel.countDocuments();
+
+    const Screen = await screenModel
+      .find(query)
+      .sort({ _id: -1 }) // Sort by _id in descending order
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    if (!Screen) {
+      return res.status(200).send({
+        message: "NO Screen found",
+        success: false,
+      });
+    }
+    return res.status(200).send({
+      message: "All Screen list ",
+      ProductCount: Screen.length,
+      currentPage: page,
+      totalPages: Math.ceil(totalProduct / limit),
+      success: true,
+      Screen,
+    });
+  } catch (error) {
+    return res.status(500).send({
+      message: `Error while getting Screen ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const updateScreenAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      image ,
+      banners ,
+      URL 
+    } = req.body;
+
+    let updateFields = {
+      image ,
+      banners ,
+      URL
+    };
+
+    const Screen = await screenModel.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+
+    return res.status(200).json({
+      message: "Screen Updated!",
+      success: true,
+      Screen,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: `Error while updating Screen: ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const getScreenIdAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Screen = await screenModel.findById(id);
+    if (!Screen) {
+      return res.status(200).send({
+        message: "Screen Not Found By Id",
+        success: false,
+      });
+    }
+    return res.status(200).json({
+      message: "fetch Single Screen!",
+      success: true,
+      Screen,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: `Error while get Screen: ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+export const deleteScreenAdmin = async (req, res) => {
+  try {
+    // Find and delete the Screen
+    await screenModel.findByIdAndDelete(req.params.id);
+
+    return res.status(200).send({
+      success: true,
+      message: "Screen deleted!",
+    });
+    
+  } catch (error) {
+    console.log(error);
+    return res.status(400).send({
+      success: false,
+      message: "Error while deleting Screen",
+      error,
+    });
+  }
+};
+
 
 export const AddAdminAttributeController = async (req, res) => {
   try {
