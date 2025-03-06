@@ -1385,40 +1385,42 @@ export const CheckoutWallet_phonepay = async (req, res) => {
   const SALT_INDEX = process.env.PHONEPE_SALT_INDEX;
   const PHONEPE_MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
 
+  const { amount, userId, note, Local } = req.body;
+
+  // Ensure amount is a valid number
+  if (isNaN(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, message: 'Invalid amount' });
+  }
+
+  const gstRate = 0.18;
+  const startAmount = amount * gstRate;
+  const finalAmount = amount + startAmount;
+
+  // Generate Transaction ID
+  const transactionId = `order_${uniqid()}`;
+
+  // Create normal payload
+  const normalPayLoad = {
+    merchantId: PHONEPE_MERCHANT_ID,
+    merchantTransactionId: transactionId,
+    merchantUserId: userId,
+    amount: finalAmount * 100, // Convert amount to paise
+    redirectUrl: `${PHONEPE_CALLBACK_URL}/${transactionId}`,
+    redirectMode: "REDIRECT",
+    callbackUrl: PHONEPE_CALLBACK_URL,
+    mobileNumber: "9999999999", // Should ideally come from req.body or be a valid number
+    paymentInstrument: {
+      type: "PAY_PAGE",
+    },
+  };
+
+  // Base64 encode the payload
+  let bufferObj = Buffer.from(JSON.stringify(normalPayLoad), "utf8");
+  let base64EncodedPayload = bufferObj.toString("base64");
+
+  
   try {
-    const { amount, userId, note, Local } = req.body;
-
-    // Ensure amount is a valid number
-    if (isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ success: false, message: 'Invalid amount' });
-    }
-
-    const gstRate = 0.18;
-    const startAmount = amount * gstRate;
-    const finalAmount = amount + startAmount;
-
-    // Generate Transaction ID
-    const transactionId = `order_${uniqid()}`;
-
-    // Create normal payload
-    const normalPayLoad = {
-      merchantId: PHONEPE_MERCHANT_ID,
-      merchantTransactionId: transactionId,
-      merchantUserId: userId,
-      amount: finalAmount * 100, // Convert amount to paise
-      redirectUrl: `${PHONEPE_CALLBACK_URL}/${transactionId}`,
-      redirectMode: "REDIRECT",
-      callbackUrl: PHONEPE_CALLBACK_URL,
-      mobileNumber: "9999999999", // Should ideally come from req.body or be a valid number
-      paymentInstrument: {
-        type: "PAY_PAGE",
-      },
-    };
-
-    // Base64 encode the payload
-    let bufferObj = Buffer.from(JSON.stringify(normalPayLoad), "utf8");
-    let base64EncodedPayload = bufferObj.toString("base64");
-
+  
     // X-VERIFY checksum generation
     let string = base64EncodedPayload + "/pg/v1/pay" + SALT_KEY;
     let sha256_val = sha256(string).toString();
