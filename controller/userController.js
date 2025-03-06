@@ -1470,8 +1470,8 @@ export const CheckoutWallet_phonepay = async (req, res) => {
 
 
   } catch (error) {
-    console.error("PhonePe Payment Error:", error);
-    res.status(500).json({ success: false, message: `Payment initiation failed ${error}` });
+    console.error("PhonePe Payment Error:", normalPayLoad, base64EncodedPayload);
+    res.status(500).json({ success: false, normalPayLoad, base64EncodedPayload ,message: `Payment initiation failed ${error}` });
   }
 };
 
