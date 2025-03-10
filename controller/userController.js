@@ -598,7 +598,7 @@ export const userAllLeadController = async (req, res) => {
       success: true,
       message: "Leads Found Successfully!",
       data: {
-        leads,
+        leads: encrypt(leads, process.env.APIKEY),
         totalCount: totalLeadsCount,
       },
     });
@@ -660,7 +660,7 @@ export const userByIdLeadController = async (req, res) => {
   }
 };
 
-export const userByLeadController = async (req, res) => {
+export const userByLeadController_old = async (req, res) => {
   // Extract pagination parameters and BuyId from the request query
   const { skip = 0, limit = 50, buyId } = req.query;
 
@@ -706,7 +706,7 @@ export const userByLeadController = async (req, res) => {
       message: "Leads fetched successfully",
       success: true,
       data: {
-        leads: filteredLeads,
+        leads: encrypt(filteredLeads, process.env.APIKEY),
         totalCount: totalLeadsCountLength.length,
       },
     });
@@ -719,6 +719,162 @@ export const userByLeadController = async (req, res) => {
     });
   }
 };
+
+ 
+export const userByLeadController = async (req, res) => {
+  try {
+    // Extract pagination parameters from the request query
+    const {
+      skip = 0,
+      limit = 50,
+      sortOrder,
+      status,
+      type,
+      searchTerm,
+      buyId,
+      startDate,
+      endDate,
+    } = req.query;
+
+    // Convert skip and limit to integers
+    const skipNumber = parseInt(skip, 10);
+    const limitNumber = parseInt(limit, 10);
+
+    const matchStage = {};
+
+    // Build the match stage for LeadModel
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, "i");
+      matchStage.$or = [{ PickupLocation: regex }, { DropLocation: regex }];
+    }
+
+    if (status && status.length > 0) {
+      if (status === "open") {
+        matchStage.status = 0; // Open leads
+      } else if (status === "closed") {
+        matchStage.status = 1; // Closed leads
+      }
+    }
+
+    if (type && type.length > 0) {
+      if (type === "ride") {
+        matchStage.type = 1; // Ride type
+      } else if (type === "tour") {
+        matchStage.type = 0; // Tour type
+      }
+    }
+
+    // Parse startDate and endDate as Date objects
+    if (startDate) {
+      matchStage.createdAt = { $gte: new Date(startDate) }; // Ensure startDate is a Date object
+    }
+
+    if (endDate) {
+      matchStage.createdAt = {
+        ...matchStage.createdAt,
+        $lte: new Date(endDate),
+      }; // Ensure endDate is a Date object
+    }
+
+    // Fix: Use 'new' to instantiate ObjectId correctly
+    if (buyId) {
+      const buyIdObject = new mongoose.Types.ObjectId(buyId); // Correct instantiation of ObjectId
+      matchStage.BuyId = { $in: [buyIdObject] }; // Match against BuyId array
+    }
+
+    const pipeline = [
+      {
+        $match: matchStage, // Match stage for LeadModel
+      },
+      {
+        $lookup: {
+          from: "buys",  // The collection name for BuyModel
+          localField: "_id", // Match Lead's _id to Buy's leadId
+          foreignField: "leadId", // Reference to leadId in BuyModel
+          as: "purchase", // The resulting field name containing purchase data
+        },
+      },
+      {
+        $unwind: {
+          path: "$purchase", // Unwind the purchase array to get individual purchase data
+          preserveNullAndEmptyArrays: true, // Keep leads even if no purchase is found
+        },
+      },
+      {
+        $sort: {
+          "purchase.createdAt": -1, // Sort by purchase's createdAt to get the latest purchase
+        },
+      },
+      {
+        $limit: 1, // Limit to the latest purchase only
+      },
+      {
+        $addFields: {
+          purchaseDate: "$purchase.createdAt", // Add the purchase date to the result
+        },
+      },
+      {
+        $group: {
+          _id: "$_id", // Group by the Lead _id
+          PickupLocation: { $first: "$PickupLocation" },
+          DropLocation: { $first: "$DropLocation" },
+          LeadId: { $first: "$LeadId" },
+          startDate: { $first: "$startDate" },
+          endDate: { $first: "$endDate" },
+          BuyId: { $first: "$BuyId" },
+          count: { $first: "$count" },
+          CPC: { $first: "$CPC" },
+          name: { $first: "$name" },
+          phone: { $first: "$phone" },
+          email: { $first: "$email" },
+          type: { $first: "$type" },
+          typeRange: { $first: "$typeRange" },
+          traveller: { $first: "$traveller" },
+          status: { $first: "$status" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          purchaseDate: { $first: "$purchaseDate" }, // Return the latest purchase date
+        },
+      },
+      {
+        $sort: {
+          _id: sortOrder === "latest" ? -1 : 1, // Sort by _id based on sortOrder
+        },
+      },
+      {
+        $skip: skipNumber, // Skip for pagination
+      },
+      {
+        $limit: limitNumber, // Limit for pagination
+      },
+    ];
+
+    // Fetch leads using aggregation
+    const leads = await LeadModel.aggregate(pipeline);
+
+    // Fetch total count of leads for client-side pagination handling
+    const totalLeadsCount = await LeadModel.countDocuments(matchStage);
+
+    return res.status(200).send({
+      success: true,
+      message: "Leads Found Successfully!",
+      data: {
+        leads: encrypt(leads, process.env.APIKEY),
+        totalCount: totalLeadsCount,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({
+      message: `Error Occurred During Fetching Leads: ${error}`,
+      success: false,
+      error,
+    });
+  }
+};
+
+
+
 
 export const userByIdReportLeadController = async (req, res) => {
   // Extract pagination parameters and BuyId from the request query
