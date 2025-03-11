@@ -806,9 +806,6 @@ export const userByLeadController = async (req, res) => {
         },
       },
       {
-        $limit: 1, // Limit to the latest purchase only
-      },
-      {
         $addFields: {
           purchaseDate: "$purchase.createdAt", // Add the purchase date to the result
         },
@@ -848,10 +845,9 @@ export const userByLeadController = async (req, res) => {
         $limit: limitNumber, // Limit for pagination
       },
     ];
-
-    // Fetch leads using aggregation
+    
     const leads = await LeadModel.aggregate(pipeline);
-
+    
     // Fetch total count of leads for client-side pagination handling
     const totalLeadsCount = await LeadModel.countDocuments(matchStage);
 
@@ -5582,22 +5578,7 @@ export const updateCompanyUser = async (req, res) => {
     }
 
     let updateFields = {};
-
-    if (!passwordType) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      updateFields = {
-        c_name: c_name,
-        address,
-        city,
-        state,
-        pincode,
-        gstin,
-        Local: statetax,
-        password: hashedPassword,
-        statename,
-      };
-    } else {
+ 
       // Prepare update fields
       updateFields = {
         c_name,
@@ -5609,7 +5590,7 @@ export const updateCompanyUser = async (req, res) => {
         Local: statetax,
         statename,
       };
-    }
+     
 
     // Perform database update
     const updatedUser = await userModel.findByIdAndUpdate(id, updateFields, {
