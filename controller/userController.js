@@ -1603,23 +1603,28 @@ export const CheckoutWallet_phonepay = async (req, res) => {
 
    await payment.save();
  
-    const response = await axios.post(
-      `${PHONE_PE_HOST_URL}/pg/v1/pay`,
-      { request: base64EncodedPayload },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-VERIFY": xVerifyChecksum,
-          accept: "application/json",
-        },
-      }
-    );
+    // const response = await axios.post(
+    //   `${PHONE_PE_HOST_URL}/pg/v1/pay`,
+    //   { request: base64EncodedPayload },
+    //   {
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       "X-VERIFY": xVerifyChecksum,
+    //       accept: "application/json",
+    //     },
+    //   }
+    // );
 
-    // Get the payment URL from the response
-    const paymentUrl = response.data.data.instrumentResponse.redirectInfo.url;
+    // // Get the payment URL from the response
+    // const paymentUrl = response.data.data.instrumentResponse.redirectInfo.url;
  
 
-    res.status(200).json({ success: true, paymentUrl });
+    res.status(200).json({ 
+      success: true, 
+      base64EncodedPayload,
+      PHONE_PE_HOST_URL,
+      xVerifyChecksum
+     });
 
 
   } catch (error) {
