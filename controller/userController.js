@@ -1769,6 +1769,43 @@ export const paymentverificationPhonepay = async (req, res) => {
   }
 };
 
+export const paymentGetPhonepay = async (req, res) => {
+  try {
+    const { merchantTransactionId } = req.params;
+    const todaydate = new Date(); // Get current date for LastRecharge field
+
+    const PHONE_PE_HOST_URL = process.env.PHONEPE_BASE_URL;
+    const MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
+    const SALT_KEY = process.env.PHONEPE_SALT_KEY;
+    const SALT_INDEX = process.env.PHONEPE_SALT_INDEX;
+ 
+      let statusUrl =
+        `${PHONE_PE_HOST_URL}/pg/v1/status/${MERCHANT_ID}/${merchantTransactionId}` ;
+
+      let string =
+        `/pg/v1/status/${MERCHANT_ID}/` + merchantTransactionId + SALT_KEY;
+      let sha256_val = sha256(string).toString(); // Ensure you convert it to a string
+      let xVerifyChecksum = sha256_val + "###" + SALT_INDEX;
+
+      const responseData = {
+        statusUrl,
+        xVerifyChecksum,
+        merchantTransactionId,
+        todaydate
+      }
+      return res.status(200).send({
+        success: true,
+        message: "get data successfully",
+        responseData,
+      });
+
+     
+  } catch (error) {
+    console.error("PhonePe Verification Error:", error);
+    res.redirect(`${process.env.LIVEWEB}all-payment`);
+  }
+};
+
 
 export const paymentverification = async (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
