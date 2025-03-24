@@ -229,7 +229,7 @@ import {
   profileUserImage,
   CheckoutWallet, CheckoutWallet_phonepay,
   WalletKey,
-  paymentverification, paymentverificationPhonepay,
+  paymentverification, paymentverificationPhonepay,paymentGetPhonepay,
   downloadUserInvoice,
   downloadAdminInvoice,
   loginwithgoogle,
@@ -562,6 +562,8 @@ router.post("/paymentverification-wallet", paymentverification);
 router.post("/checkout-wallet-phonepay", checkOrigin, CheckoutWallet_phonepay);
 
 router.get("/paymentverification-wallet-phonepay/:merchantTransactionId", paymentverificationPhonepay);
+router.get("/get-verify/:merchantTransactionId",checkOrigin, paymentGetPhonepay);
+ 
 
 router.get("/api/get-key", checkOrigin, WalletKey);
 
