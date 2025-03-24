@@ -1686,7 +1686,7 @@ export const paymentverificationPhonepay = async (req, res) => {
     const { merchantTransactionId } = req.params;
     const todaydate = new Date(); // Get current date for LastRecharge field
 
-    const PHONE_PE_HOST_URL = process.env.PHONE_PE_HOST_URL;
+    const PHONE_PE_HOST_URL = process.env.PHONEPE_BASE_URL;
     const MERCHANT_ID = process.env.PHONEPE_MERCHANT_ID;
     const SALT_KEY = process.env.PHONEPE_SALT_KEY;
     const SALT_INDEX = process.env.PHONEPE_SALT_INDEX;
