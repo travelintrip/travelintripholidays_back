@@ -1727,6 +1727,15 @@ export const paymentverificationPhonepay = async (req, res) => {
                 { new: true }
               );
 
+              const gstRate = 0.18; // 18% GST
+
+              // Calculate the base amount before GST
+              const baseAmount = payment.totalAmount / (1 + gstRate);
+          
+              const finalAmount = baseAmount.toFixed(2);
+          
+              await AddWalletPayment(payment.userId, 0, payment.note, finalAmount);
+              
               // Redirect to success page
               res.redirect(`${process.env.LIVEWEB}PaymentSuccess?reference=${merchantTransactionId}`);
             } else {
