@@ -1741,6 +1741,12 @@ export const paymentverificationPhonepay = async (req, res) => {
               // Redirect to success page
               res.redirect(`${process.env.LIVEWEB}PaymentSuccess?reference=${merchantTransactionId}`);
             } else {
+              await paymentModel.findOneAndUpdate(
+                { razorpay_order_id: merchantTransactionId },
+                { payment: 2 },
+                { new: true }
+              ).lean(); // Use .lean() to get a plain JavaScript object
+  
               // Payment not found, handle error case
               res.redirect(`${process.env.LIVEWEB}all-payment`);
             }
