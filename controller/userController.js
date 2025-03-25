@@ -1707,7 +1707,7 @@ export const paymentverificationPhonepay = async (req, res) => {
           headers: {
             "Content-Type": "application/json",
             "X-VERIFY": xVerifyChecksum,
-            "X-MERCHANT-ID": merchantTransactionId,
+            "X-MERCHANT-ID": MERCHANT_ID,
             accept: "application/json",
           },
         })
