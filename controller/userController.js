@@ -1571,27 +1571,10 @@ export const CheckoutWallet_phonepay = async (req, res) => {
  let string = base64EncodedPayload + "/pg/v1/pay" + SALT_KEY;
  let sha256_val = sha256(string);
  let xVerifyChecksum = sha256_val + "###" + SALT_INDEX;
-
-  // Calculate the auto-increment ID
-  const lastLead = await paymentModel.findOne().sort({ _id: -1 }).limit(1);
-  let paymentId;
-
-  if (lastLead) {
-    if (lastLead.paymentId === undefined) {
-      paymentId = 1;
-    } else {
-      // Convert lastOrder.orderId to a number before adding 1
-      const lastOrderId = parseInt(lastLead.paymentId);
-      paymentId = lastOrderId + 1;
-    }
-  } else {
-    paymentId = 1;
-  }
-
-
+ 
     // Store the payment details in DB
     const payment = await new paymentModel({
-      paymentId:paymentId,
+      paymentId:0,
       totalAmount: finalAmount,
       userId: userId,
        note: note,
@@ -1714,10 +1697,30 @@ export const paymentverificationPhonepay = async (req, res) => {
         .then(async function (response) {
           console.log('response->', response.data);
           if (response.data && response.data.code === "PAYMENT_SUCCESS") {
+
+            
+            const lastLead = await paymentModel.findOne({ paymentId: { $ne: 0 } })
+            .sort({ _id: -1 })
+            .limit(1);
+
+  let paymentId;
+
+  if (lastLead) {
+    if (lastLead.paymentId === undefined) {
+      paymentId = 1;
+    } else {
+      // Convert lastOrder.orderId to a number before adding 1
+      const lastOrderId = parseInt(lastLead.paymentId);
+      paymentId = lastOrderId + 1;
+    }
+  } else {
+    paymentId = 1;
+  } 
             // Update the payment status in the database
             const payment = await paymentModel.findOneAndUpdate(
               { razorpay_order_id: merchantTransactionId },
               { payment: 1 },
+              {paymentId},
               { new: true }
             ).lean(); // Use .lean() to get a plain JavaScript object
             
