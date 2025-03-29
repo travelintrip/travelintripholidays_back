@@ -1699,7 +1699,7 @@ export const paymentverificationPhonepay = async (req, res) => {
           if (response.data && response.data.code === "PAYMENT_SUCCESS") {
 
             
-            const lastLead = await paymentModel.findOne({ paymentId: { $ne: 0 } })
+ const lastLead = await paymentModel.findOne({ paymentId: { $ne: 0 } })
             .sort({ _id: -1 })
             .limit(1);
 
@@ -1718,12 +1718,15 @@ export const paymentverificationPhonepay = async (req, res) => {
   } 
             // Update the payment status in the database
             const payment = await paymentModel.findOneAndUpdate(
+              {paymentId : paymentId},
               { razorpay_order_id: merchantTransactionId },
               { payment: 1 },
-              {paymentId},
               { new: true }
             ).lean(); // Use .lean() to get a plain JavaScript object
             
+            console.log('paymentId->',paymentId);
+
+
             if (payment) {
               // Update the user's last recharge date if payment is successful
               await userModel.findOneAndUpdate(
@@ -1813,6 +1816,34 @@ export const paymentGetPhonepay = async (req, res) => {
     console.error("PhonePe Verification Error:", error);
     res.redirect(`${process.env.LIVEWEB}all-payment`);
   }
+};
+
+export const getLastId = async (req, res) => {
+  try {
+              
+ const lastLead = await paymentModel.findOne({ paymentId: { $ne: 0 } })
+ .sort({ _id: -1 })
+ .limit(1);
+
+let paymentId;
+
+if (lastLead) {
+if (lastLead.paymentId === undefined) {
+paymentId = 1;
+} else {
+// Convert lastOrder.orderId to a number before adding 1
+const lastOrderId = parseInt(lastLead.paymentId);
+paymentId = lastOrderId + 1;
+}
+} else {
+paymentId = 1;
+} 
+ 
+console.error("PhonePe Verification Error:", paymentId);
+
+  } catch (error) {
+    console.error("PhonePe Verification Error:", error);
+   }
 };
 
 
