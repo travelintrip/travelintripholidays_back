@@ -1716,16 +1716,12 @@ export const paymentverificationPhonepay = async (req, res) => {
   } else {
     paymentId = 1;
   } 
-            // Update the payment status in the database
-            const payment = await paymentModel.findOneAndUpdate(
-              {paymentId : paymentId},
-              { razorpay_order_id: merchantTransactionId },
-              { payment: 1 },
-              { new: true }
-            ).lean(); // Use .lean() to get a plain JavaScript object
-            
-            console.log('paymentId->',paymentId);
 
+   const payment = await paymentModel.findOneAndUpdate(
+   { razorpay_order_id: merchantTransactionId },
+   {payment: 1 , paymentId },
+   { new: true }
+   ).lean(); 
 
             if (payment) {
               // Update the user's last recharge date if payment is successful
@@ -1839,7 +1835,15 @@ paymentId = lastOrderId + 1;
 paymentId = 1;
 } 
  
-console.error("PhonePe Verification Error:", paymentId);
+//      // Update the payment status in the database
+//    const payment = await paymentModel.findOneAndUpdate(
+//       { razorpay_order_id: 'order_jc1oszm2nm8ralyi5' },
+//      {payment: 1 , paymentId, paymentConfirm :1 },
+//      { new: true }
+//    ).lean(); // Use .lean() to get a plain JavaScript object
+    
+
+// console.error("PhonePe Verification Error:", paymentId , payment);
 
   } catch (error) {
     console.error("PhonePe Verification Error:", error);
