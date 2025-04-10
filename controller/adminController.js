@@ -5157,7 +5157,7 @@ export const AdminUpdateWallet = async (req, res) => {
   }
 };
 
-export const exportTransUserAdmin = async (req, res) => {
+export const exportTransUserAdmin_old = async (req, res) => {
   try {
     // Fetch data from the database (assuming using Mongoose)
     //   const products = await productModel.find({}, 'title description pImage images slug regularPrice salePrice status stock Category weight tag').lean();
@@ -5187,6 +5187,83 @@ export const exportTransUserAdmin = async (req, res) => {
     res.status(500).send("Internal Server Error");
   }
 };
+
+export const exportTransUserAdmin = async (req, res) => {
+  try {
+    // Fetch data from the database including user details
+    const transaction = await paymentModel
+      .find({ payment: 1 }, "t_id userId note amount totalAmount createdAt razorpay_order_id paymentId")
+      .populate('userId', 'username gstin statename Local address city pincode')  // Assuming 'userId' is populated with these fields
+      .lean();
+
+    const gstRate = 0.18; // GST rate (18%)
+    const filename = "all_payments.csv";
+
+    // Prepare the CSV data
+    const csvData = transaction.map((row) => {
+      const user = row.userId || {}; // Ensure userId is defined
+      const totalAmount = row.totalAmount || 0; // Default to 0 if totalAmount is undefined
+      const totalWithGST = totalAmount;
+      const amountWithoutGST = totalWithGST / (1 + gstRate);
+      const CSGT = totalWithGST - amountWithoutGST;
+      const TotalLocal = CSGT / 2;
+      
+   // Calculate IGST, CGST, and SGST based on the user's state
+   let igst = 0.00;
+   let cgst = 0.00;
+   let sgst = 0.00;
+
+   // If Local is 1, it's an interstate transaction, so calculate IGST
+   if (user.Local === 1) {
+     igst = parseFloat((totalWithGST - amountWithoutGST).toFixed(2)); // Convert to float for arithmetic
+   }
+   // If Local is 0, it's an intrastate transaction, calculate CGST and SGST
+   if (user.Local === 0) {
+     cgst = sgst = parseFloat(TotalLocal.toFixed(2)); // Convert to float for arithmetic
+   }
+
+
+      const TotalAmountWith = totalAmount - (igst+cgst+sgst);
+
+      return {
+        paymentId : row.paymentId  || 'N/A',
+        date: new Date(row.createdAt).toLocaleDateString(), // Format date as needed
+        name: user.username || 'Not Found',
+        gstin: user.gstin || 'Not Found',
+        Address: user.address || 'Not Found',
+        City: user.city || 'Not Found',
+        state: user.statename || 'Not Found',
+        Pincode: user.pincode || 'Not Found',
+        amount: TotalAmountWith.toFixed(2),  // Safely format amount with toFixed(2)
+        IGST: igst,  // Calculated IGST
+        CGST: cgst,  // Calculated CGST
+        SGST: sgst,  // Calculated SGST
+        totalAmount: totalAmount.toFixed(2),  // Safely format amount with toFixed(2)
+        action: 'Invoice'  // Action field, could be a placeholder for button or download action
+      };
+    });
+
+    // Stringify the data into CSV format
+    stringify(csvData, { header: true }, (err, csvString) => {
+      if (err) {
+        console.error("Error generating CSV:", err);
+        res.status(500).send("Internal Server Error");
+        return;
+      }
+
+      // Set response headers for CSV file download
+      res.header("Content-Type", "text/csv");
+      res.attachment(filename);
+
+      // Send the CSV content
+      res.send(csvString);
+    });
+  } catch (error) {
+    console.error("Error exporting payments:", error);
+    res.status(500).send("Internal Server Error");
+  }
+};
+
 
 export const exportTransUserInvoiceAdmin = async (req, res) => {
   console.log("exportTransUserInvoiceAdmin");
