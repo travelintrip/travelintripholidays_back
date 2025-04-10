@@ -5118,7 +5118,7 @@ export const AdminUpdateWallet = async (req, res) => {
     const transaction = new transactionModel({
       userId: _id,
       type: Type,
-      note: "Funds Added By Admin " + "( " + Comment + " )",
+      note: "Wallet Credited / Debited by Admin " + "( " + Comment + " )",
       amount: FinalAmount * (Type === 1 ? -1 : 1), // Ensure amount is negative if Type is 1 (minus)
       t_id,
       t_no: lastTransId,
