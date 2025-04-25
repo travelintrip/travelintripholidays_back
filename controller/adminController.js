@@ -3634,7 +3634,7 @@ export const getAllPaymentsInvoiceAdmin = async (req, res) => {
     const page = parseInt(req.query.page) || 1; // Current page, default is 1
     const limit = parseInt(req.query.limit) || 10; // Number of documents per page, default is 10
     const searchTerm = req.query.search || ""; // Get search term from the query parameters
-    const type = 1;
+    const type = req.query.status || ""; 
     // Get startDate and endDate from query parameters
     const startDate = req.query.startDate
       ? new Date(req.query.startDate)
@@ -3663,8 +3663,9 @@ export const getAllPaymentsInvoiceAdmin = async (req, res) => {
     } else if (endDate) {
       query.createdAt = { $lte: endDate };
     }
-    query.payment = { $in: type }; // Use $in operator to match any of the values in the array
-
+    if(type.length !== 0 && type !== '3'){
+      query.payment = { $in: type }; // Use $in operator to match any of the values in the array
+    }
     const totalData = await paymentModel.countDocuments(query); // Count total documents matching the query
     const data = await paymentModel
       .find(query)
@@ -5190,9 +5191,21 @@ export const exportTransUserAdmin_old = async (req, res) => {
 
 export const exportTransUserAdmin = async (req, res) => {
   try {
+    let status = req.params.id;
+
+    // Convert status to a string and check
+    if (status === '3') {
+      status = '';
+    }
+
+    // Build the query object conditionally
+    const query = {};
+    if (status) {
+      query.payment = status;
+    }
     // Fetch data from the database including user details
     const transaction = await paymentModel
-      .find({ payment: 1 }, "t_id userId note amount totalAmount createdAt razorpay_order_id paymentId")
+      .find( query , "t_id userId note amount totalAmount createdAt razorpay_order_id paymentId")
       .populate('userId', 'username gstin statename Local address city pincode')  // Assuming 'userId' is populated with these fields
       .lean();
 
