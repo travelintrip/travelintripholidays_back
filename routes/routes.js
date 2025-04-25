@@ -228,7 +228,7 @@ import {
   getAllLeadsEmployee,
   profileUserImage,
   CheckoutWallet, CheckoutWallet_phonepay,
-  WalletKey,
+  WalletKey,getLastId,
   paymentverification, paymentverificationPhonepay,paymentGetPhonepay,
   downloadUserInvoice,
   downloadAdminInvoice,
@@ -457,7 +457,7 @@ router.post("/admin/import/allproducts/", checkOrigin, importAllProAdmin);
 
 router.post("/admin/update-wallet", checkOrigin, AdminUpdateWallet);
 
-router.get("/admin/export/alltrans", checkOrigin, exportTransUserAdmin);
+router.get("/admin/export/alltrans/:id", checkOrigin, exportTransUserAdmin);
 
 router.get(
   "/admin/export-invoice/alltrans",
@@ -566,6 +566,8 @@ router.get("/get-verify/:merchantTransactionId",checkOrigin, paymentGetPhonepay)
  
 
 router.get("/api/get-key", checkOrigin, WalletKey);
+router.get("/get-last", getLastId);
+
 
 router.get("/all-transaction/:userId/", checkOrigin, AllTransaction);
 router.get("/all-payment/:userId/", checkOrigin, AllPayment);
